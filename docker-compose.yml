@@ -1,0 +1,64 @@
+services:
+  market-data:
+    build: ./services/market-data
+    ports:
+      - "8001:8001"
+    volumes:
+      - market_data_db:/app/data
+    environment:
+      MARKET_DATA_DB_PATH: /app/data/market_data.db
+      GOLD_TZ: Asia/Jakarta
+
+  insight:
+    build: ./services/insight
+    ports:
+      - "8002:8002"
+    volumes:
+      - insight_db:/app/data
+    environment:
+      INSIGHT_DB_PATH: /app/data/insight.db
+      MARKET_DATA_URL: http://market-data:8001
+      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
+      SUMOPOD_BASE_URL: ${SUMOPOD_BASE_URL:-https://ai.sumopod.com/v1}
+      SUMOPOD_MODEL: ${SUMOPOD_MODEL:-gpt-4o-mini}
+      SUMOPOD_CHAT_MODEL: ${SUMOPOD_CHAT_MODEL:-gpt-4o-mini}
+      GNEWS_API_KEY: ${GNEWS_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+    depends_on:
+      - market-data
+
+  notification:
+    build: ./services/notification
+    ports:
+      - "3000:3000"
+    volumes:
+      - notification_db:/app/data
+    environment:
+      NOTIFICATION_DB_PATH: /app/data/notification.db
+      MARKET_DATA_URL: http://market-data:8001
+      INSIGHT_URL: http://insight:8002
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-change-me}
+    depends_on:
+      - market-data
+      - insight
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_MARKET_DATA_URL: http://localhost:8001
+        VITE_INSIGHT_URL: http://localhost:8002
+        VITE_NOTIFICATION_URL: http://localhost:3000
+    ports:
+      - "5173:80"
+    depends_on:
+      - market-data
+      - insight
+      - notification
+
+volumes:
+  market_data_db:
+  insight_db:
+  notification_db:
