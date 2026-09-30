@@ -27,5 +27,6 @@ least a little price history, or `/narrate` and the chat tools will 404/error.
 | GET | `/health` | Liveness check |
 | POST | `/narrate` `{group, banner?}` | Fetch stats from Market Data, LLM-explain, persist, return the full narration |
 | GET | `/analysis/{group}` | Last saved narration for a group |
+| GET | `/analysis/{group}/history?limit=2` | Newest-first saved runs (1–20); the web app diffs the two newest for "since the previous run" |
 | GET | `/why-moved?display=BTC&pct=-6.2` | Tavily-backed one-line "why" for a specific move |
-| POST | `/chat` `{chat_id, message}` | Tool-equipped Q&A reply, grounded in the latest analysis + rolling per-chat history |
+| POST | `/chat` `{chat_id, message, context?}` | Tool-equipped Q&A reply, grounded in the latest analysis + rolling per-chat history. Optional `context` (≤4000 chars, e.g. the user's holdings) is injected for that turn only and never stored |

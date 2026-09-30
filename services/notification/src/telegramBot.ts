@@ -12,9 +12,14 @@
  *  - Anyone else must /start first, which files a pending row and pings the
  *    owner. Only once approved do they get broadcasts and chat replies.
  *  - /stop deactivates; a later /start reactivates without re-approval.
+ *  - Owner-only /agent <message> reaches the Agent Service (real,
+ *    unsandboxed shell access to the VPS) -- deliberately a separate
+ *    command from free-text chat, so an ordinary conversational message can
+ *    never accidentally trigger a destructive ops action.
  */
 import { Telegraf } from "telegraf";
 import { message } from "telegraf/filters";
+import * as agent from "./agentClient.js";
 import { config } from "./config.js";
 import * as db from "./db.js";
 import * as insight from "./insightClient.js";
@@ -31,6 +36,15 @@ async function replyViaInsight(chatId: string, text: string): Promise<string> {
   } catch (err) {
     console.error("insight chat call failed", err);
     return "Sorry, I couldn't reach the insight service just now -- please try again shortly.";
+  }
+}
+
+async function replyViaAgent(chatId: string, text: string): Promise<string> {
+  try {
+    return await agent.chat(`telegram:${chatId}`, text);
+  } catch (err) {
+    console.error("agent chat call failed", err);
+    return "Sorry, I couldn't reach the agent service just now -- please try again shortly.";
   }
 }
 
@@ -119,6 +133,18 @@ bot.command("deny", async (ctx) => {
   }
   const ok = db.denySubscriber(target);
   await ctx.reply(ok ? `Denied ${target}.` : `No pending request for ${target}.`);
+});
+
+bot.command("agent", async (ctx) => {
+  const chatId = String(ctx.chat.id);
+  if (!isOwner(chatId)) return;
+  const text = ctx.message.text.replace(/^\/agent(@\w+)?\s*/, "").trim();
+  if (!text) {
+    await ctx.reply("Usage: /agent <message> -- talks to the ops agent (real shell access to the VPS).");
+    return;
+  }
+  const reply = await replyViaAgent(chatId, text);
+  await ctx.reply(reply.slice(0, 4000)); // Telegram's message length cap is ~4096 chars
 });
 
 bot.on(message("text"), async (ctx) => {
