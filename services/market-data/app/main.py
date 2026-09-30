@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import db, scheduler, signals
@@ -42,13 +43,32 @@ def sources():
     return {"sources": signals.SOURCE_META, "groups": signals.GROUPS}
 
 
+def _downsample(rows: list, max_points: int) -> list:
+    """Keep the last row of each of `max_points` equal time buckets. Crypto
+    logs every minute, so 90 raw days is ~130k rows per source -- far more
+    than a chart can draw. Bucketing by time (not by row index) keeps gaps in
+    ingestion looking like gaps instead of compressing them away."""
+    if len(rows) <= max_points:
+        return rows
+    parse = datetime.fromisoformat
+    start, end = parse(rows[0]["fetched_at"]), parse(rows[-1]["fetched_at"])
+    span = (end - start).total_seconds() or 1
+    buckets: dict[int, object] = {}
+    for r in rows:
+        i = min(max_points - 1, int((parse(r["fetched_at"]) - start).total_seconds() / span * max_points))
+        buckets[i] = r
+    return [buckets[i] for i in sorted(buckets)]
+
+
 @app.get("/prices/{source}")
-def prices(source: str, days: int = 30):
+def prices(source: str, days: int = 30, max_points: int | None = Query(None, ge=2)):
     if source not in signals.SOURCE_META:
         raise HTTPException(404, f"unknown source {source!r}")
     conn = db.connect()
     try:
         rows = db.recent_prices(conn, source, days=days)
+        if max_points:
+            rows = _downsample(rows, max_points)
         return {
             "source": source,
             "points": [

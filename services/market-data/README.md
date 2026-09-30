@@ -25,7 +25,7 @@ one data point.
 |---|---|---|
 | GET | `/health` | Liveness check |
 | GET | `/sources` | Known sources + which groups they belong to |
-| GET | `/prices/{source}?days=30` | Raw time series (for frontend charts) |
+| GET | `/prices/{source}?days=30&max_points=` | Time series for frontend charts. Optional `max_points` (≥2) keeps the last row of each of N equal time buckets -- crypto logs every minute, so always pass it from the UI |
 | GET | `/signals/{source}?days=30` | Stats + BUY/SELL/WAIT for one source |
 | GET | `/signals?group=crypto\|gold&days=30` | Stats + signal for every source in a group |
 | GET | `/sudden-move-check` | Biggest BTC/ETH/SOL move right now if ≥5% in the last hour, else `null`. Stateless — the caller (Notification service) tracks cooldown. |

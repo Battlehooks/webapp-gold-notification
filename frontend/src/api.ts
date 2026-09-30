@@ -1,6 +1,7 @@
 const MARKET_DATA_URL = import.meta.env.VITE_MARKET_DATA_URL || "http://localhost:8001";
 const INSIGHT_URL = import.meta.env.VITE_INSIGHT_URL || "http://localhost:8002";
 const NOTIFICATION_URL = import.meta.env.VITE_NOTIFICATION_URL || "http://localhost:3000";
+const AGENT_URL = import.meta.env.VITE_AGENT_URL || "http://localhost:8003";
 
 export interface SourceMeta {
   display: string;
@@ -60,9 +61,10 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const marketData = {
   sources: () => getJson<GroupsResponse>(`${MARKET_DATA_URL}/sources`),
-  prices: (source: string, days = 30) =>
+  prices: (source: string, days = 30, maxPoints?: number) =>
     getJson<{ source: string; points: PricePoint[] }>(
-      `${MARKET_DATA_URL}/prices/${source}?days=${days}`
+      `${MARKET_DATA_URL}/prices/${source}?days=${days}` +
+        (maxPoints ? `&max_points=${maxPoints}` : "")
     ),
   groupSignals: (group: string, days = 30) =>
     getJson<GroupSignalsResponse>(`${MARKET_DATA_URL}/signals?group=${group}&days=${days}`),
@@ -70,17 +72,31 @@ export const marketData = {
 
 export const insight = {
   analysis: (group: string) => getJson<AnalysisRun>(`${INSIGHT_URL}/analysis/${group}`),
+  history: (group: string, limit = 2) =>
+    getJson<{ group: string; runs: AnalysisRun[] }>(
+      `${INSIGHT_URL}/analysis/${group}/history?limit=${limit}`
+    ),
   narrate: (group: string) =>
     getJson<AnalysisRun & { title: string }>(`${INSIGHT_URL}/narrate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ group }),
     }),
-  chat: (chatId: string, message: string) =>
+  // `context` is per-turn background (the user's holdings); insight never stores it.
+  chat: (chatId: string, message: string, context?: string) =>
     getJson<{ chat_id: string; reply: string }>(`${INSIGHT_URL}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, message }),
+      body: JSON.stringify({ chat_id: chatId, message, context: context || undefined }),
+    }),
+};
+
+export const agent = {
+  chat: (token: string, sessionId: string, message: string) =>
+    getJson<{ session_id: string; reply: string }>(`${AGENT_URL}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-agent-token": token },
+      body: JSON.stringify({ session_id: sessionId, message }),
     }),
 };
 

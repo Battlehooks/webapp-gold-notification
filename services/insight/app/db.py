@@ -74,12 +74,21 @@ def save_analysis_run(
 
 
 def latest_analysis_run(conn: sqlite3.Connection, group_name: str) -> dict | None:
-    row = conn.execute(
-        "SELECT * FROM analysis_runs WHERE group_name = ? ORDER BY id DESC LIMIT 1",
-        (group_name,),
-    ).fetchone()
-    if not row:
-        return None
+    runs = recent_analysis_runs(conn, group_name, limit=1)
+    return runs[0] if runs else None
+
+
+def recent_analysis_runs(conn: sqlite3.Connection, group_name: str, limit: int) -> list[dict]:
+    """Newest first. Two of these are what the web app diffs for its
+    "since the previous run" list -- the diff is plain data, not LLM output."""
+    rows = conn.execute(
+        "SELECT * FROM analysis_runs WHERE group_name = ? ORDER BY id DESC LIMIT ?",
+        (group_name, limit),
+    ).fetchall()
+    return [_run_from_row(row) for row in rows]
+
+
+def _run_from_row(row: sqlite3.Row) -> dict:
     return {
         "group_name": row["group_name"],
         "created_at": row["created_at"],

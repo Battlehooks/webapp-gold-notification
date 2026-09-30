@@ -40,6 +40,13 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-change-me}
+      # Agent Service runs bare-metal on the host, not in compose -- see
+      # services/agent/README.md. host.docker.internal is how a container
+      # reaches back out to a process on its own host (Docker Engine 20.10+).
+      AGENT_URL: http://host.docker.internal:8003
+      AGENT_TOKEN: ${AGENT_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - market-data
       - insight
@@ -51,6 +58,7 @@ services:
         VITE_MARKET_DATA_URL: http://localhost:8001
         VITE_INSIGHT_URL: http://localhost:8002
         VITE_NOTIFICATION_URL: http://localhost:3000
+        VITE_AGENT_URL: ${VITE_AGENT_URL:-http://localhost:8003}
     ports:
       - "5173:80"
     depends_on:

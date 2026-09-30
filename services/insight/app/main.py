@@ -10,9 +10,9 @@ from __future__ import annotations
 import logging
 import traceback
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app import chat, db, market_data_client, news
 from app.narration import GROUPS, format_summary, llm_reasoning
@@ -33,6 +33,9 @@ class NarrateRequest(BaseModel):
 class ChatRequest(BaseModel):
     chat_id: str
     message: str
+    # Optional per-request facts from the web app (the viewer's holdings).
+    # Given to the model for this turn only, never persisted to chat_history.
+    context: str | None = Field(None, max_length=4000)
 
 
 @app.get("/health")
@@ -95,6 +98,17 @@ def analysis(group: str):
         conn.close()
 
 
+@app.get("/analysis/{group}/history")
+def analysis_history(group: str, limit: int = Query(2, ge=1, le=20)):
+    if group not in GROUPS:
+        raise HTTPException(404, f"unknown group {group!r}, expected one of {sorted(GROUPS)}")
+    conn = db.connect()
+    try:
+        return {"group": group, "runs": db.recent_analysis_runs(conn, group, limit)}
+    finally:
+        conn.close()
+
+
 @app.get("/why-moved")
 def why_moved(display: str, pct: float):
     return {"why": news.why_moved(display, pct)}
@@ -102,5 +116,5 @@ def why_moved(display: str, pct: float):
 
 @app.post("/chat")
 def chat_endpoint(req: ChatRequest):
-    reply = chat.answer(req.chat_id, req.message)
+    reply = chat.answer(req.chat_id, req.message, context=req.context)
     return {"chat_id": req.chat_id, "reply": reply}
