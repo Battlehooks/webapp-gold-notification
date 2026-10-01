@@ -1,11 +1,13 @@
-"""SQLite storage for price history. This service owns the `prices` table
-exclusively -- no other service reads this file directly, only via HTTP."""
+"""Storage for price history: SQLite, or Postgres when DATABASE_URL is set
+(this service's own schema, see app/pg_compat.py). This service owns the
+`prices` table exclusively -- no other service reads it directly, only via
+HTTP."""
 from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone
 
-from app.config import DB_PATH
+from app.config import DATABASE_URL, DB_PATH, DB_SCHEMA
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS prices (
@@ -20,7 +22,24 @@ CREATE INDEX IF NOT EXISTS idx_prices_source_time ON prices (source, fetched_at)
 """
 
 
+PG_SCHEMA = """
+CREATE TABLE IF NOT EXISTS prices (
+    id BIGSERIAL PRIMARY KEY,
+    source TEXT NOT NULL,
+    sell DOUBLE PRECISION NOT NULL,
+    buyback DOUBLE PRECISION NOT NULL,
+    source_updated_at TEXT,
+    fetched_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_prices_source_time ON prices (source, fetched_at);
+"""
+
+
 def connect() -> sqlite3.Connection:
+    if DATABASE_URL:
+        from app import pg_compat
+
+        return pg_compat.connect(DATABASE_URL, DB_SCHEMA, PG_SCHEMA, id_tables={"prices"})
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)

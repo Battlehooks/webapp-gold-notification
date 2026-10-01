@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
 
-// No holdings API exists -- holdings are personal, per-browser, and never leave
-// it except as per-turn `context` on an Ask request.
+// Holdings are personal and per-browser. They leave it only as per-turn
+// `context` on an Ask request, and -- while push alerts are on -- as a copy the
+// Notification service keeps to check take-profit/stop-loss (see alerts.ts).
 export interface Holding {
   source: string;
   qty: number;

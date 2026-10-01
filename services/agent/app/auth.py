@@ -1,6 +1,5 @@
-"""Auth dependency for the /chat route. Mirrors notification/src/adminApi.ts's
-requireAdmin: fail-closed if the shared secret is unset or doesn't match --
-an empty AGENT_TOKEN must never mean "open access".
+"""Auth dependency for the /chat route: fail-closed if the shared secret is
+unset or doesn't match -- an empty AGENT_TOKEN must never mean "open access".
 """
 from __future__ import annotations
 

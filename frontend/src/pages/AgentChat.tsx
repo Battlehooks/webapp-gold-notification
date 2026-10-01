@@ -77,8 +77,8 @@ export function AgentChat() {
           <div className="chat-log">
             {turns.length === 0 && (
               <p className="muted">
-                Ask it to check disk/memory, list or restart containers, tail logs, or
-                manage Telegram subscribers. Every action it takes is logged.
+                Ask it to check disk/memory, list or restart containers, or tail logs.
+                Every action it takes is logged.
               </p>
             )}
             {turns.map((turn, i) => (

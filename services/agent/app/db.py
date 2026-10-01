@@ -10,7 +10,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 
-from app.config import DB_PATH
+from app.config import DATABASE_URL, DB_PATH, DB_SCHEMA
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS agent_chat_history (
@@ -41,7 +41,40 @@ CREATE INDEX IF NOT EXISTS idx_command_audit_log_ts ON command_audit_log (ts);
 EXCERPT_MAX_CHARS = 4000
 
 
+PG_SCHEMA = """
+CREATE TABLE IF NOT EXISTS agent_chat_history (
+    id BIGSERIAL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_agent_chat_history_session_id_id ON agent_chat_history (session_id, id);
+
+CREATE TABLE IF NOT EXISTS command_audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    ts TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    tool_name TEXT NOT NULL,
+    args_json TEXT NOT NULL,
+    ok INTEGER NOT NULL,
+    exit_code INTEGER,
+    stdout_excerpt TEXT,
+    stderr_excerpt TEXT,
+    duration_ms INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_command_audit_log_session_id_id ON command_audit_log (session_id, id);
+CREATE INDEX IF NOT EXISTS idx_command_audit_log_ts ON command_audit_log (ts);
+"""
+
+
 def connect() -> sqlite3.Connection:
+    if DATABASE_URL:
+        from app import pg_compat
+
+        return pg_compat.connect(
+            DATABASE_URL, DB_SCHEMA, PG_SCHEMA, id_tables={"agent_chat_history", "command_audit_log"}
+        )
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)

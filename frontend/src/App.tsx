@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
+import { syncAlerts, useAlerts } from "./alerts";
 import { AppContext, useApp, type AppCtx } from "./appContext";
+import { AlertsDialog } from "./components/AlertsDialog";
 import { AskPanel } from "./components/AskPanel";
 import { HoldingsDialog } from "./components/HoldingsDialog";
 import { fmtJakarta } from "./format";
 import { useHoldings } from "./holdings";
 import { holdingsContext, latestRunTime, OVERVIEW_CHIPS, positions as toPositions } from "./model";
-import { Admin } from "./pages/Admin";
 import { AgentChat } from "./pages/AgentChat";
 import { AssetDetail } from "./pages/AssetDetail";
 import { Overview } from "./pages/Overview";
@@ -25,6 +26,14 @@ export default function App() {
   const ask = useAsk(() => holdingsContext(positions));
   const [askOpen, setAskOpen] = useState(false);
   const [holdingsOpen, setHoldingsOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const alertStatus = useAlerts().status;
+
+  // While alerts are on, the server checks holdings for take-profit/stop-loss,
+  // so its copy follows every edit (and is refreshed once per visit).
+  useEffect(() => {
+    if (alertStatus === "on") void syncAlerts(holdings);
+  }, [holdings, alertStatus]);
 
   const ctx: AppCtx = {
     market,
@@ -38,6 +47,7 @@ export default function App() {
       if (question) ask.ask(question);
     },
     openHoldings: () => setHoldingsOpen(true),
+    openAlerts: () => setAlertsOpen(true),
   };
 
   const detailAsset = route.page === "asset" ? market.bySource[route.source] : undefined;
@@ -50,7 +60,7 @@ export default function App() {
     : OVERVIEW_CHIPS;
 
   let body;
-  if (route.page === "admin" || route.page === "agent") {
+  if (route.page === "agent") {
     body = (
       <div className={isPhone ? "legacy-page legacy-page-phone" : "app"}>
         {isPhone ? (
@@ -61,10 +71,10 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <WebNav page={route.page} onAsk={() => setAskOpen(true)} />
+          <WebNav page={route.page} onAsk={() => setAskOpen(true)} onAlerts={() => setAlertsOpen(true)} />
         )}
-        <h4>{route.page === "admin" ? "Subscribers" : "Ops agent"}</h4>
-        {route.page === "admin" ? <Admin /> : <AgentChat />}
+        <h4>Ops agent</h4>
+        <AgentChat />
       </div>
     );
   } else if (isPhone) {
@@ -72,7 +82,7 @@ export default function App() {
   } else {
     body = (
       <div className="app">
-        <WebNav page="home" onAsk={() => setAskOpen(true)} />
+        <WebNav page="home" onAsk={() => setAskOpen(true)} onAlerts={() => setAlertsOpen(true)} />
         {route.page === "asset" ? <AssetDetail source={route.source} onBack={() => go("/")} /> : <Overview />}
       </div>
     );
@@ -83,12 +93,14 @@ export default function App() {
       <div className="app-bg">{body}</div>
       {!isPhone && <AskPanel open={askOpen} onClose={() => setAskOpen(false)} chips={chips} />}
       {holdingsOpen && <HoldingsDialog onClose={() => setHoldingsOpen(false)} />}
+      {alertsOpen && <AlertsDialog onClose={() => setAlertsOpen(false)} />}
     </AppContext.Provider>
   );
 }
 
-function WebNav({ page, onAsk }: { page: "home" | "admin" | "agent"; onAsk: () => void }) {
+function WebNav({ page, onAsk, onAlerts }: { page: "home" | "agent"; onAsk: () => void; onAlerts: () => void }) {
   const { market } = useApp();
+  const alertsOn = useAlerts().status === "on";
   const updated = latestRunTime(market.runs);
   return (
     <nav className="nav app-nav">
@@ -99,15 +111,16 @@ function WebNav({ page, onAsk }: { page: "home" | "admin" | "agent"; onAsk: () =
       <a href="#/" aria-current={page === "home" ? "page" : undefined}>
         Overview
       </a>
-      <a href="#/admin" aria-current={page === "admin" ? "page" : undefined}>
-        Admin
-      </a>
       <a href="#/agent" aria-current={page === "agent" ? "page" : undefined}>
         Agent
       </a>
       <span className="meta-text">
         {updated ? `Updated ${fmtJakarta(updated)}` : market.groups.every((g) => market.runs[g]) && market.groups.length ? "No runs yet" : ""}
       </span>
+      <button className="btn btn-secondary" onClick={onAlerts} aria-label={alertsOn ? "Alerts (on)" : "Alerts"}>
+        <i className={alertsOn ? "ph-fill ph-bell-ringing" : "ph ph-bell"} />
+        Alerts
+      </button>
       <button className="btn btn-primary" onClick={onAsk}>
         <i className="ph ph-sparkle" />
         Ask AI

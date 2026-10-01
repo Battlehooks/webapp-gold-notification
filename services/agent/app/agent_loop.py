@@ -21,7 +21,7 @@ from app.config import (
     SUMOPOD_BASE_URL,
     SUMOPOD_CHAT_MODEL,
 )
-from app.tools import docker_ops, shell, subscribers, system_info
+from app.tools import docker_ops, shell, system_info
 
 TOOL_NAMES = {
     "run_shell",
@@ -30,25 +30,21 @@ TOOL_NAMES = {
     "tail_logs",
     "disk_usage",
     "memory_usage",
-    "list_subscribers",
-    "approve_subscriber",
-    "deny_subscriber",
 }
 
 SYSTEM_PROMPT = (
     "You are an ops assistant with REAL, UNSANDBOXED shell access to the VPS "
     "hosting this project's Docker services. You are reachable only by the "
-    "project owner, through an authenticated Telegram command or an "
-    "authenticated web page -- there is no other audience. Every tool call "
+    "project owner, through an authenticated web page -- there is no other "
+    "audience. Every tool call "
     "you make, especially run_shell, is permanently logged (command, output, "
     "exit code, duration) before you ever see the result, for accountability. "
     "Prefer the narrow tools (restart_container, tail_logs, disk_usage, "
-    "memory_usage, list_subscribers, approve_subscriber, deny_subscriber) over "
+    "memory_usage) over "
     "run_shell when one of them already does what's needed -- reach for "
     "run_shell only for genuinely ad-hoc diagnostics. Never invent command "
     "output; only report what a tool actually returned. If an action could be "
-    "destructive (restarting a service, deleting files, changing subscriber "
-    "state), state plainly what you're about to do, then do it -- the owner "
+    "destructive (restarting a service, deleting files), state plainly what you're about to do, then do it -- the owner "
     "already authorized this agent for exactly this kind of action, so don't "
     "ask permission first, but stay transparent about what ran and what it "
     "returned. Reply in the same language as the owner's most recent message.\n\n"
@@ -67,11 +63,7 @@ SYSTEM_PROMPT = (
     "- tail_logs(name, lines=100): last N lines of docker compose logs for "
     "one service.\n"
     "- disk_usage(): disk space per mounted filesystem (Linux host only).\n"
-    "- memory_usage(): total/used/free/available memory in MB (Linux host only).\n"
-    "- list_subscribers(): all Telegram subscribers from the Notification "
-    "Service (chat_id, status, username).\n"
-    "- approve_subscriber(chat_id) / deny_subscriber(chat_id): approve or "
-    "deny a pending Telegram subscription request.\n\n"
+    "- memory_usage(): total/used/free/available memory in MB (Linux host only).\n\n"
     f"You get at most {AGENT_MAX_TOOL_ROUNDS} tool calls before you must "
     "answer. Don't re-fetch something you already have from earlier in this "
     "conversation."
@@ -91,12 +83,6 @@ def _dispatch(name: str, args: dict) -> dict:
         return system_info.disk_usage()
     if name == "memory_usage":
         return system_info.memory_usage()
-    if name == "list_subscribers":
-        return subscribers.list_subscribers()
-    if name == "approve_subscriber":
-        return subscribers.approve_subscriber(args.get("chat_id", ""))
-    if name == "deny_subscriber":
-        return subscribers.deny_subscriber(args.get("chat_id", ""))
     return {"error": f"unknown tool {name!r}"}
 
 

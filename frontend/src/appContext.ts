@@ -13,6 +13,8 @@ export interface AppCtx {
   /** Web: open the slide-over. Phone: switch to the Ask tab. Optionally sends a question. */
   openAsk: (question?: string) => void;
   openHoldings: () => void;
+  /** Open the push-alerts settings dialog. */
+  openAlerts: () => void;
 }
 
 export const AppContext = createContext<AppCtx | null>(null);

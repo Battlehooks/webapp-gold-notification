@@ -61,7 +61,7 @@ export function Phone({ route }: { route: Route }) {
 }
 
 function PhoneHome() {
-  const { market, positions, held, openHoldings } = useApp();
+  const { market, positions, held, openHoldings, openAlerts } = useApp();
   const pf = usePortfolio();
   const changes = useChanges();
   const [briefOpen, setBriefOpen] = useState(false);
@@ -164,7 +164,15 @@ function PhoneHome() {
       {market.error && <div className="banner error">{market.error}</div>}
 
       <div className="phone-links">
-        <a href="#/admin">Admin</a>
+        <a
+          href="#/"
+          onClick={(e) => {
+            e.preventDefault();
+            openAlerts();
+          }}
+        >
+          Alerts
+        </a>
         <span>·</span>
         <a href="#/agent">Agent</a>
       </div>

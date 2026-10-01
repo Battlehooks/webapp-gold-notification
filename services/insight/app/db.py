@@ -9,7 +9,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 
-from app.config import ANALYSIS_RUNS_KEEP_PER_GROUP, DB_PATH
+from app.config import ANALYSIS_RUNS_KEEP_PER_GROUP, DATABASE_URL, DB_PATH, DB_SCHEMA
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS analysis_runs (
@@ -34,7 +34,36 @@ CREATE INDEX IF NOT EXISTS idx_chat_history_chat_id_id ON chat_history (chat_id,
 """
 
 
+PG_SCHEMA = """
+CREATE TABLE IF NOT EXISTS analysis_runs (
+    id BIGSERIAL PRIMARY KEY,
+    group_name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    stats_json TEXT NOT NULL,
+    reasoning_json TEXT,
+    headlines_json TEXT NOT NULL,
+    banner TEXT,
+    summary_text TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_analysis_runs_group_id ON analysis_runs (group_name, id);
+CREATE TABLE IF NOT EXISTS chat_history (
+    id BIGSERIAL PRIMARY KEY,
+    chat_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_history_chat_id_id ON chat_history (chat_id, id);
+"""
+
+
 def connect() -> sqlite3.Connection:
+    if DATABASE_URL:
+        from app import pg_compat
+
+        return pg_compat.connect(
+            DATABASE_URL, DB_SCHEMA, PG_SCHEMA, id_tables={"analysis_runs", "chat_history"}
+        )
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)

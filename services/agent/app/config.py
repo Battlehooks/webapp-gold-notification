@@ -26,17 +26,20 @@ def _load_dotenv(path: Path) -> None:
 
 
 _load_dotenv(BASE_DIR / ".env")
+# Shared services/.env that every service reads. Loaded second, so a value in
+# this service's own .env (above) wins over it.
+_load_dotenv(BASE_DIR.parent / ".env")
 
 DB_PATH = Path(os.environ.get("AGENT_DB_PATH", BASE_DIR / "agent.db"))
+# Postgres instead of DB_PATH when set (see app/pg_compat.py); this service's
+# tables live in their own schema of that shared database.
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+DB_SCHEMA = os.environ.get("DB_SCHEMA", "agent")
 PORT = int(os.environ.get("PORT", "8003"))
 
 # Shared secret required as the x-agent-token header on every /chat call.
 # This is the single highest-blast-radius secret in the repo -- see README.
 AGENT_TOKEN = os.environ.get("AGENT_TOKEN", "")
-
-# Other services this one calls over HTTP -- never their databases directly.
-NOTIFICATION_URL = os.environ.get("NOTIFICATION_URL", "http://localhost:3000")
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
 
 SUMOPOD_API_KEY = os.environ.get("SUMOPOD_API_KEY", "")
 SUMOPOD_BASE_URL = os.environ.get("SUMOPOD_BASE_URL", "https://ai.sumopod.com/v1")

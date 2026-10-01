@@ -13,7 +13,8 @@ Calls the Market Data Service over HTTP for stats — never touches its database
 ```bash
 python -m venv .venv && .venv/Scripts/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in SUMOPOD_API_KEY at minimum; GNEWS/TAVILY optional
+# secrets live in the shared services/.env (from services/.env.example):
+# SUMOPOD_API_KEY at minimum; GNEWS/TAVILY optional
 uvicorn app.main:app --reload --port 8002
 ```
 

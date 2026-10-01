@@ -5,6 +5,9 @@ import '@phosphor-icons/web/fill/style.css'
 import './nocturne.css'
 import './index.css'
 import App from './App.tsx'
+import { initAlerts } from './alerts'
+
+void initAlerts()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -1,7 +1,7 @@
 """LLM narration of the (already-decided, historical-data-only) rule-based
 signal computed by the Market Data Service. Ported from the root project's
-trend_summary.py -- minus the chart/Telegram parts, which live in
-Notification. The LLM explains the signal; it never gets to change it.
+trend_summary.py -- minus the chart and Telegram delivery (the web app shows
+narration on its dashboard instead). The LLM explains the signal; it never gets to change it.
 """
 from __future__ import annotations
 

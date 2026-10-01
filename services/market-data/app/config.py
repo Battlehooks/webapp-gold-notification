@@ -21,8 +21,15 @@ def _load_dotenv(path: Path) -> None:
 
 
 _load_dotenv(BASE_DIR / ".env")
+# Shared services/.env that every service reads. Loaded second, so a value in
+# this service's own .env (above) wins over it.
+_load_dotenv(BASE_DIR.parent / ".env")
 
 DB_PATH = Path(os.environ.get("MARKET_DATA_DB_PATH", BASE_DIR / "market_data.db"))
+# Postgres instead of DB_PATH when set (see app/pg_compat.py); this service's
+# tables live in their own schema of that shared database.
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+DB_SCHEMA = os.environ.get("DB_SCHEMA", "market_data")
 TIMEZONE = os.environ.get("GOLD_TZ", "Asia/Jakarta")
 PORT = int(os.environ.get("PORT", "8001"))
 
