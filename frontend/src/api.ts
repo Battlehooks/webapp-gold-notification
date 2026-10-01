@@ -100,31 +100,32 @@ export const agent = {
     }),
 };
 
-export interface Subscriber {
-  chat_id: string;
-  status: "pending" | "active" | "stopped";
-  username: string | null;
-  requested_at: string;
-  decided_at: string | null;
+export interface AlertRules {
+  /** Alert when a holding's P/L reaches +N% (null = off). */
+  takeProfitPct: number | null;
+  /** Alert when a holding's P/L falls to -N% (null = off). */
+  stopLossPct: number | null;
+  signalChanges: boolean;
+  suddenMoves: boolean;
 }
 
-export const notificationAdmin = {
-  subscribers: (token: string) =>
-    getJson<{ subscribers: Subscriber[] }>(`${NOTIFICATION_URL}/admin/subscribers`, {
-      headers: { "x-admin-token": token },
+export interface PushDevice {
+  subscription: PushSubscriptionJSON;
+  holdings: { source: string; qty: number; avg: number }[];
+  rules: AlertRules;
+}
+
+/** The Notification service's push alerts. */
+export const pushAlerts = {
+  publicKey: () => getJson<{ publicKey: string }>(`${NOTIFICATION_URL}/push/public-key`),
+  save: (deviceId: string, device: PushDevice) =>
+    getJson<{ ok: boolean }>(`${NOTIFICATION_URL}/push/devices/${deviceId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(device),
     }),
-  pending: (token: string) =>
-    getJson<{ pending: Subscriber[] }>(`${NOTIFICATION_URL}/admin/subscribers/pending`, {
-      headers: { "x-admin-token": token },
-    }),
-  approve: (chatId: string, token: string) =>
-    getJson<{ ok: boolean }>(`${NOTIFICATION_URL}/admin/subscribers/${chatId}/approve`, {
-      method: "POST",
-      headers: { "x-admin-token": token },
-    }),
-  deny: (chatId: string, token: string) =>
-    getJson<{ ok: boolean }>(`${NOTIFICATION_URL}/admin/subscribers/${chatId}/deny`, {
-      method: "POST",
-      headers: { "x-admin-token": token },
-    }),
+  remove: (deviceId: string) =>
+    getJson<{ ok: boolean }>(`${NOTIFICATION_URL}/push/devices/${deviceId}`, { method: "DELETE" }),
+  test: (deviceId: string) =>
+    getJson<{ ok: boolean }>(`${NOTIFICATION_URL}/push/devices/${deviceId}/test`, { method: "POST" }),
 };

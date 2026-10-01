@@ -1,6 +1,6 @@
 """Stats + deterministic BUY/SELL/WAIT signal engine. Ported from the root
 project's trend_summary.py (the historical-price-only parts -- no LLM, no
-chart, no Telegram; those live in the Insight and Notification services).
+chart, no delivery; narration lives in Insight, alerts in Notification).
 """
 from __future__ import annotations
 

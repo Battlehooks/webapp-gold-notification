@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-// Tiny hash router: #/ · #/assets · #/ask · #/asset/<source> · #/admin · #/agent.
+// Tiny hash router: #/ · #/assets · #/ask · #/asset/<source> · #/agent.
 // Hash-based so the static nginx container needs no rewrite rules and the
 // browser back button works.
 export type Route =
@@ -8,7 +8,6 @@ export type Route =
   | { page: "assets" }
   | { page: "ask" }
   | { page: "asset"; source: string }
-  | { page: "admin" }
   | { page: "agent" };
 
 function parse(hash: string): Route {
@@ -18,8 +17,6 @@ function parse(hash: string): Route {
       return { page: "assets" };
     case "ask":
       return { page: "ask" };
-    case "admin":
-      return { page: "admin" };
     case "agent":
       return { page: "agent" };
     case "asset":

@@ -1,52 +1,52 @@
+# Secrets come from services/.env (copy services/.env.example), the same file
+# the services read when run standalone. Everything under `environment:` is
+# compose-specific wiring and wins over that file; every other setting has a
+# default in the service's own config.
+x-shared-env: &shared-env
+  env_file:
+    - path: ./services/.env
+      required: false
+
 services:
   market-data:
     build: ./services/market-data
+    <<: *shared-env
     ports:
       - "8001:8001"
     volumes:
       - market_data_db:/app/data
     environment:
+      # Used only while DATABASE_URL (services/.env) is blank.
       MARKET_DATA_DB_PATH: /app/data/market_data.db
+      DB_SCHEMA: market_data
       GOLD_TZ: Asia/Jakarta
 
   insight:
     build: ./services/insight
+    <<: *shared-env
     ports:
       - "8002:8002"
     volumes:
       - insight_db:/app/data
     environment:
       INSIGHT_DB_PATH: /app/data/insight.db
+      DB_SCHEMA: insight
       MARKET_DATA_URL: http://market-data:8001
-      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
-      SUMOPOD_BASE_URL: ${SUMOPOD_BASE_URL:-https://ai.sumopod.com/v1}
-      SUMOPOD_MODEL: ${SUMOPOD_MODEL:-gpt-4o-mini}
-      SUMOPOD_CHAT_MODEL: ${SUMOPOD_CHAT_MODEL:-gpt-4o-mini}
-      GNEWS_API_KEY: ${GNEWS_API_KEY:-}
-      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
     depends_on:
       - market-data
 
   notification:
     build: ./services/notification
+    <<: *shared-env
     ports:
       - "3000:3000"
     volumes:
       - notification_db:/app/data
     environment:
       NOTIFICATION_DB_PATH: /app/data/notification.db
+      DB_SCHEMA: notification
       MARKET_DATA_URL: http://market-data:8001
       INSIGHT_URL: http://insight:8002
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
-      ADMIN_TOKEN: ${ADMIN_TOKEN:-change-me}
-      # Agent Service runs bare-metal on the host, not in compose -- see
-      # services/agent/README.md. host.docker.internal is how a container
-      # reaches back out to a process on its own host (Docker Engine 20.10+).
-      AGENT_URL: http://host.docker.internal:8003
-      AGENT_TOKEN: ${AGENT_TOKEN:-}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       - market-data
       - insight

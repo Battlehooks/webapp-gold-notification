@@ -117,6 +117,23 @@ def signals_for_group(group: str, days: int = 30):
         conn.close()
 
 
+@app.get("/latest")
+def latest():
+    """Newest stored price per source, sell *and* buyback. The signal stats
+    only carry sell; the Notification service needs buyback (what you'd
+    actually get selling) to judge a holding's profit for alerts."""
+    conn = db.connect()
+    try:
+        out = {}
+        for source in signals.SOURCE_META:
+            row = db.previous_price(conn, source)
+            if row:
+                out[source] = {"sell": row["sell"], "buyback": row["buyback"], "fetched_at": row["fetched_at"]}
+        return {"sources": out}
+    finally:
+        conn.close()
+
+
 @app.get("/sudden-move-check")
 def sudden_move_check():
     """Stateless: reports the biggest qualifying move right now, if any.

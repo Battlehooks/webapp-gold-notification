@@ -48,8 +48,8 @@ export function HoldingsDialog({ onClose }: { onClose: () => void }) {
           My holdings
         </div>
         <div className="dialog-body">
-          Stored only in this browser. They're sent along with your Ask questions so answers can refer to your
-          position; nothing else reads them.
+          Stored in this browser. They're sent along with your Ask questions so answers can refer to your
+          position, and kept by the server only while price alerts are on.
         </div>
 
         {rows.length === 0 && <div className="text-muted" style={{ fontSize: 13 }}>No holdings yet.</div>}

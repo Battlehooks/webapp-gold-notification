@@ -1,38 +1,30 @@
 import cors from "cors";
 import express from "express";
-import { adminRouter } from "./adminApi.js";
 import { config } from "./config.js";
+import { initDb } from "./db.js";
+import { pushEnabled } from "./push.js";
+import { pushRouter } from "./pushApi.js";
 import * as scheduler from "./scheduler.js";
-import { bot } from "./telegramBot.js";
+
+// Tables must exist before the first request or scheduled job touches them.
+await initDb();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
-app.use("/admin", adminRouter);
+app.get("/health", (_req, res) => res.json({ status: "ok", push: pushEnabled }));
+app.use("/push", pushRouter);
 
 app.listen(config.port, () => {
   console.log(`notification service listening on :${config.port}`);
 });
 
-// Telegram only allows one getUpdates consumer per bot token at a time, so
-// SKIP_TELEGRAM_POLLING lets this process run (admin API, scheduler,
-// outbound sendMessage) without competing against another deployment of
-// the same bot -- e.g. running this locally against a token that's also
-// polled by a live server.
-if (config.telegramBotToken && process.env.SKIP_TELEGRAM_POLLING !== "1") {
-  bot
-    .launch()
-    .then(() => console.log("telegram bot launched (long polling)"))
-    .catch((err) => console.error("failed to launch telegram bot", err));
-} else if (!config.telegramBotToken) {
-  console.warn("TELEGRAM_BOT_TOKEN not set -- bot not launched, admin API still available");
-} else {
-  console.warn("SKIP_TELEGRAM_POLLING=1 -- bot not launched, admin API + outbound sendMessage still available");
+if (!pushEnabled) {
+  console.warn(
+    "VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY not set -- push alerts are off (narration still runs). " +
+      "Generate a pair with `npx web-push generate-vapid-keys`."
+  );
 }
 
 scheduler.start();
-
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));

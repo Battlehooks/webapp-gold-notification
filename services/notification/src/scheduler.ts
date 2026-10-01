@@ -1,45 +1,35 @@
 /**
- * Drives the routine narration broadcast and the sudden-move override, by
- * calling Market Data + Insight over HTTP and pushing the result via
- * Telegram. Ported from the root project's trend_summary.py cron
- * entrypoints (--group crypto every 4h, --group gold daily,
- * --check-sudden-move every 5 min), now run in-process via node-cron
- * instead of relying on host cron.
+ * The service's clock. Two jobs:
+ *
+ *  - Narration: has Insight write the routine AI analysis the dashboard
+ *    shows (crypto every 4h, gold daily) -- ported from the root project's
+ *    trend_summary.py cron entrypoints, now in-process via node-cron.
+ *  - Alerts (alerts.ts): holdings P/L every minute, signal flips and sudden
+ *    moves every 5 minutes, delivered as Web Push to every browser that
+ *    turned alerts on.
+ *
+ * Every job catches its own errors: an unhandled rejection would take the
+ * whole process down.
  */
 import cron from "node-cron";
+import * as alerts from "./alerts.js";
 import { config } from "./config.js";
 import * as db from "./db.js";
 import * as insight from "./insightClient.js";
 import * as marketData from "./marketDataClient.js";
-import { broadcastMessage, recipients } from "./telegramBot.js";
 
 const SUDDEN_MOVE_STATE_KEY = "sudden_move_crypto_last_sent";
 
-async function runNarrationBroadcast(group: string, banner?: string): Promise<void> {
-  try {
-    const result = await insight.narrate(group, banner);
-    const parts: string[] = [];
-    if (banner) parts.push(banner);
-    parts.push(`\u{1F4C8} ${result.title}`);
-    parts.push(result.summary_text);
-    parts.push("Not financial advice -- personal reference only.");
-    await broadcastMessage(parts.join("\n\n"), recipients());
-  } catch (err) {
-    console.error(`narration broadcast failed for group=${group}`, err);
-  }
+async function runNarration(group: string, banner?: string): Promise<void> {
+  const result = await insight.narrate(group, banner);
+  console.log(`narration stored for group=${group}: ${result.title}`);
 }
 
 async function checkSuddenMove(): Promise<void> {
-  let check;
-  try {
-    check = await marketData.getSuddenMoveCheck();
-  } catch (err) {
-    console.error("sudden-move check failed", err);
-    return;
-  }
+  const check = await marketData.getSuddenMoveCheck();
   if (!check.move) return;
 
-  const lastSent = db.getState(SUDDEN_MOVE_STATE_KEY);
+  const lastSent = await db.getState(SUDDEN_MOVE_STATE_KEY);
   if (lastSent) {
     const elapsedMin = (Date.now() - new Date(lastSent.replace(" ", "T") + "Z").getTime()) / 60000;
     if (elapsedMin < config.suddenMoveCooldownMin) return;
@@ -47,19 +37,31 @@ async function checkSuddenMove(): Promise<void> {
 
   const { source, pct } = check.move;
   const arrow = pct > 0 ? "▲" : "▼";
-  let banner = `\u{1F6A8} Sudden move alert -- ${source.toUpperCase()} ${arrow} ${Math.abs(pct).toFixed(1)}% in the last ${check.window_min} min`;
   const why = await insight.whyMoved(source.toUpperCase(), pct).catch(() => null);
+  let banner = `\u{1F6A8} Sudden move alert -- ${source.toUpperCase()} ${arrow} ${Math.abs(pct).toFixed(1)}% in the last ${check.window_min} min`;
   if (why) banner += `\n${why}`;
 
-  await runNarrationBroadcast("crypto", banner);
-  db.setState(SUDDEN_MOVE_STATE_KEY, new Date().toISOString().slice(0, 19).replace("T", " "));
+  // Cooldown first: a failing narration or push must not re-fire every 5 min.
+  await db.setState(SUDDEN_MOVE_STATE_KEY, new Date().toISOString().slice(0, 19).replace("T", " "));
+  await alerts.pushSuddenMove(source, pct, check.window_min, why);
+  await runNarration("crypto", banner).catch((err) => console.error("sudden-move narration failed", err));
+}
+
+function every(expr: string, name: string, job: () => Promise<void>): void {
+  cron.schedule(expr, () => {
+    job().catch((err) => console.error(`${name} failed`, err));
+  });
 }
 
 export function start(): void {
-  cron.schedule("0 */4 * * *", () => void runNarrationBroadcast("crypto"));
-  cron.schedule("30 23 * * *", () => void runNarrationBroadcast("gold"));
-  cron.schedule("*/5 * * * *", () => void checkSuddenMove());
-  console.log("scheduler started: crypto=every 4h, gold=daily@23:30 UTC, sudden-move-check=every 5 min");
+  every("0 */4 * * *", "crypto narration", () => runNarration("crypto"));
+  every("30 23 * * *", "gold narration", () => runNarration("gold"));
+  every("*/5 * * * *", "sudden-move check", checkSuddenMove);
+  every("*/5 * * * *", "signal check", alerts.checkSignals);
+  every("* * * * *", "holdings check", alerts.checkPositions);
+  console.log(
+    "scheduler started: narration crypto=4h gold=daily@23:30 UTC; alerts holdings=1min signals+sudden-move=5min"
+  );
 }
 
-export const _internal = { runNarrationBroadcast, checkSuddenMove };
+export const _internal = { runNarration, checkSuddenMove };
