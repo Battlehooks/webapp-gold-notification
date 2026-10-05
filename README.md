@@ -92,6 +92,25 @@ Each backend service can also run standalone outside Docker for development — 
 own README (`services/*/README.md`) for the venv/npm-install instructions used to build
 and test this project.
 
+### Hosting it publicly on a VPS
+
+`docker-compose.vps.yml` puts everything behind [Caddy](deploy/Caddyfile) on port 443
+with an automatic Let's Encrypt certificate. HTTPS isn't optional: browsers only allow
+push alerts on a secure origin. The frontend calls its APIs on the same origin
+(`/api/market-data`, `/api/insight`, `/api/notification`), and the services' own ports
+are bound to `127.0.0.1`, so only 443 faces the internet.
+
+```bash
+export SITE_ADDRESS=gold.example.com   # DNS must point here; no domain? use <ip-with-dashes>.sslip.io
+docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
+```
+
+Every later `docker compose` command (logs, restart, ...) needs the same two `-f` flags
+and `SITE_ADDRESS`. Caddy proves the domain over port 443 alone (TLS-ALPN), so port 80
+can stay with another web server. Containers restart on their own after a reboot.
+The Agent is never proxied (it has shell access to the host), so its tab only works
+from a browser on the same machine as the agent.
+
 ## Moving to Postgres
 
 Every service keeps working on SQLite until it's given a connection string. With one,

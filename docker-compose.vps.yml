@@ -1,0 +1,58 @@
+# Public deployment on a VPS: everything behind Caddy on :443 with an
+# automatic certificate. Layered on top of docker-compose.yml:
+#
+#   SITE_ADDRESS=gold.example.com docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
+#
+# SITE_ADDRESS is the public hostname (its DNS must point at this server);
+# without a domain, <ip-with-dashes>.sslip.io works, e.g. 203-0-113-7.sslip.io.
+# Only port 443 is published publicly -- port 80 may belong to another web
+# server, so Caddy proves domain ownership over 443 (TLS-ALPN). The services'
+# own ports are bound to 127.0.0.1 for debugging from the VPS only.
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  market-data:
+    <<: *restart
+    ports: !override
+      - "127.0.0.1:8001:8001"
+
+  insight:
+    <<: *restart
+    ports: !override
+      - "127.0.0.1:8002:8002"
+
+  notification:
+    <<: *restart
+    ports: !override
+      - "127.0.0.1:3000:3000"
+
+  frontend:
+    <<: *restart
+    build:
+      args:
+        VITE_MARKET_DATA_URL: /api/market-data
+        VITE_INSIGHT_URL: /api/insight
+        VITE_NOTIFICATION_URL: /api/notification
+    ports: !reset []
+
+  caddy:
+    image: caddy:2-alpine
+    <<: *restart
+    ports:
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS to the public hostname}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - market-data
+      - insight
+      - notification
+
+volumes:
+  caddy_data:
+  caddy_config:
