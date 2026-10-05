@@ -38,16 +38,29 @@ if (config.databaseUrl && !/^[a-z_][a-z0-9_]*$/.test(config.dbSchema)) {
   throw new Error(`DB_SCHEMA must be a plain lowercase identifier, got ${JSON.stringify(config.dbSchema)}`);
 }
 
-// Postgres: a pool whose every new server connection is pointed at this
-// service's schema. Needs a session-stable connection (Sumobase's Direct
-// Connection or Session Pooler), not the Transaction Pooler.
+// Postgres: a pool whose every server connection is pointed at this service's
+// schema before its first query. Needs a session-stable connection
+// (Sumobase's Direct Connection or Session Pooler), not the Transaction Pooler.
 const pool = config.databaseUrl ? new pg.Pool({ connectionString: config.databaseUrl, max: 5 }) : null;
-pool?.on("connect", (client) => {
-  client.query(`SET search_path TO ${config.dbSchema}`).catch((err) => {
-    console.error("failed to set search_path on new postgres connection", err);
-  });
-});
 pool?.on("error", (err) => console.error("idle postgres connection error", err));
+const configured = new WeakSet<pg.PoolClient>();
+
+async function pgQuery(sql: string, params: (string | null)[]) {
+  const client = await pool!.connect();
+  try {
+    if (!configured.has(client)) {
+      await client.query(`SET search_path TO ${config.dbSchema}`);
+      configured.add(client);
+    }
+    const result = await client.query(toPg(sql), params);
+    client.release();
+    return result;
+  } catch (err) {
+    // Throw away a connection that may be broken rather than reuse it.
+    client.release(err instanceof Error ? err : true);
+    throw err;
+  }
+}
 
 // node:sqlite (built into Node 22.5+) instead of better-sqlite3: same
 // synchronous prepared-statement API, but no native addon to compile --
@@ -61,12 +74,12 @@ const toPg = (sql: string): string => {
 };
 
 async function all<T>(sql: string, ...params: (string | null)[]): Promise<T[]> {
-  if (pool) return (await pool.query(toPg(sql), params)).rows as T[];
+  if (pool) return (await pgQuery(sql, params)).rows as T[];
   return lite!.prepare(sql).all(...(params as SQLInputValue[])) as T[];
 }
 
 async function run(sql: string, ...params: (string | null)[]): Promise<number> {
-  if (pool) return (await pool.query(toPg(sql), params)).rowCount ?? 0;
+  if (pool) return (await pgQuery(sql, params)).rowCount ?? 0;
   return Number(lite!.prepare(sql).run(...(params as SQLInputValue[])).changes);
 }
 

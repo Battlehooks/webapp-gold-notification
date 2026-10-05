@@ -1,0 +1,23 @@
+# Public HTTPS front door for the VPS deployment (docker-compose.vps.yml).
+# One origin serves the app and proxies its APIs, so the browser never needs
+# the services' own ports and Web Push gets the secure context it requires.
+# Caddy fetches and renews the certificate itself.
+#
+# The agent service is deliberately NOT proxied: it has real shell access on
+# the host and must stay off the internet.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	handle_path /api/market-data/* {
+		reverse_proxy market-data:8001
+	}
+	handle_path /api/insight/* {
+		reverse_proxy insight:8002
+	}
+	handle_path /api/notification/* {
+		reverse_proxy notification:3000
+	}
+	handle {
+		reverse_proxy frontend:80
+	}
+}
