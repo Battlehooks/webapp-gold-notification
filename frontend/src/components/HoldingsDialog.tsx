@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useApp } from "../appContext";
-import { holdingUnit, saveHoldings, type Holding } from "../holdings";
+import { fmtRp } from "../format";
+import { holdingUnit, saveHoldings, useHoldingLots, type Holding } from "../holdings";
 import { groupLabel } from "../useMarket";
 
 interface Row {
@@ -9,10 +10,17 @@ interface Row {
   avg: string;
 }
 
+const parseQty = (s: string) => Number(s.replace(",", "."));
+// Whole rupiah; "2.380.000" (id-ID grouping) and "2380000" both parse.
+const parseAvg = (s: string) => (s.trim() === "" ? NaN : Math.round(Number(s.replace(/[.\s]/g, "").replace(",", "."))));
+
 export function HoldingsDialog({ onClose }: { onClose: () => void }) {
-  const { holdings, market } = useApp();
+  const { market } = useApp();
+  // Rows are purchases: the same asset may be listed more than once at different
+  // costs, and the rest of the app sees them merged (see holdings.ts).
+  const lots = useHoldingLots();
   const [rows, setRows] = useState<Row[]>(() =>
-    holdings.map((h) => ({ source: h.source, qty: String(h.qty), avg: String(h.avg) }))
+    lots.map((h) => ({ source: h.source, qty: String(h.qty), avg: String(h.avg) }))
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -22,19 +30,17 @@ export function HoldingsDialog({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const firstFree = market.assets.find((a) => !rows.some((r) => r.source === a.source))?.source;
+  const nextSource = (market.assets.find((a) => !rows.some((r) => r.source === a.source)) ?? market.assets[0])?.source;
   const update = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
   function save() {
     const next: Holding[] = [];
     for (const r of rows) {
-      const qty = Number(r.qty.replace(",", "."));
-      // Whole rupiah; "2.380.000" (id-ID grouping) and "2380000" both parse.
-      const avg = Math.round(Number(r.avg.replace(/[.\s]/g, "").replace(",", ".")));
+      const qty = parseQty(r.qty);
+      const avg = parseAvg(r.avg);
       const name = market.bySource[r.source]?.meta.display ?? r.source;
       if (!(qty > 0)) return setError(`${name}: quantity must be a positive number.`);
-      if (!(avg >= 0) || r.avg.trim() === "") return setError(`${name}: average cost must be a number (IDR per unit).`);
-      if (next.some((h) => h.source === r.source)) return setError(`${name} is listed twice — combine them into one row.`);
+      if (!(avg >= 0)) return setError(`${name}: average cost must be a number (IDR per unit).`);
       next.push({ source: r.source, qty, avg });
     }
     saveHoldings(next);
@@ -92,11 +98,22 @@ export function HoldingsDialog({ onClose }: { onClose: () => void }) {
           );
         })}
 
-        {firstFree && (
+        {combined(rows).map(({ source, qty, avg }) => {
+          const meta = market.bySource[source]?.meta;
+          const unit = holdingUnit(meta);
+          return (
+            <div key={source} className="text-muted" style={{ fontSize: 13 }}>
+              {meta?.display ?? source} combined: {qty.toLocaleString("id-ID", { maximumFractionDigits: 8 })} {unit} at an
+              average of {fmtRp(avg)}/{unit}
+            </div>
+          );
+        })}
+
+        {nextSource && (
           <div>
-            <button className="btn btn-ghost" onClick={() => setRows((rs) => [...rs, { source: firstFree, qty: "", avg: "" }])}>
+            <button className="btn btn-ghost" onClick={() => setRows((rs) => [...rs, { source: nextSource, qty: "", avg: "" }])}>
               <i className="ph ph-plus" />
-              Add asset
+              Add purchase
             </button>
           </div>
         )}
@@ -113,4 +130,17 @@ export function HoldingsDialog({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
+}
+
+/** Assets listed on more than one row, merged the way the rest of the app sees
+ * them. Skipped while any of that asset's rows doesn't parse yet. */
+function combined(rows: Row[]): Holding[] {
+  const out: Holding[] = [];
+  for (const source of new Set(rows.map((r) => r.source))) {
+    const mine = rows.filter((r) => r.source === source).map((r) => ({ qty: parseQty(r.qty), avg: parseAvg(r.avg) }));
+    if (mine.length < 2 || mine.some((l) => !(l.qty > 0) || !(l.avg >= 0))) continue;
+    const qty = mine.reduce((t, l) => t + l.qty, 0);
+    out.push({ source, qty, avg: mine.reduce((t, l) => t + l.qty * l.avg, 0) / qty });
+  }
+  return out;
 }
