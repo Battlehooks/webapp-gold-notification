@@ -1,6 +1,6 @@
 # Market Data Service
 
-Ingests Pegadaian/Treasury gold and BTC/ETH/SOL (Indodax) prices on its own internal
+Ingests Pegadaian and IndoGold (Antam retail) gold and BTC/ETH/SOL (Indodax) prices on its own internal
 schedule (APScheduler, not host cron) and computes a deterministic BUY/SELL/WAIT signal
 from historical price data only — no LLM, no news, ported directly from the root
 project's `trend_summary.py` stats engine. Owns its own SQLite file; nothing else in

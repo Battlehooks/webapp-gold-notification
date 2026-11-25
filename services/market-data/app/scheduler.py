@@ -36,8 +36,8 @@ def _fetch_crypto_fast() -> None:
         _fetch_and_store(name, fn)
 
 
-def _fetch_treasury() -> None:
-    _fetch_and_store("treasury", fetchers_gold.fetch_treasury)
+def _fetch_indogold() -> None:
+    _fetch_and_store("indogold", fetchers_gold.fetch_indogold)
 
 
 def _fetch_pegadaian() -> None:
@@ -49,11 +49,12 @@ def start() -> BackgroundScheduler:
     # BTC/ETH/SOL: Indodax's public API is documented at 180 req/min, so
     # every 1 min (3 requests) is comfortably safe.
     scheduler.add_job(_fetch_crypto_fast, IntervalTrigger(minutes=1), id="crypto_fast")
-    # Treasury: undocumented endpoint, no published rate limit -- stays on a
-    # more conservative cadence.
-    scheduler.add_job(_fetch_treasury, IntervalTrigger(minutes=15), id="treasury")
+    # IndoGold: the Antam retail price is scraped from its harga page, which carries
+    # the page's own date. How often Antam really changes it is not documented, so
+    # it is fetched once daily (09:30 WIB, a chosen time, not Antam's update time).
+    scheduler.add_job(_fetch_indogold, CronTrigger(hour=2, minute=30), id="indogold")
     # Pegadaian: a slow once-daily print, no point polling more often.
     scheduler.add_job(_fetch_pegadaian, CronTrigger(hour=23, minute=30), id="pegadaian")
     scheduler.start()
-    log.info("ingestion scheduler started: crypto_fast=1min treasury=15min pegadaian=daily@23:30UTC")
+    log.info("ingestion scheduler started: crypto_fast=1min indogold=daily@02:30UTC pegadaian=daily@23:30UTC")
     return scheduler

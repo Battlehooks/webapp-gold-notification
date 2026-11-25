@@ -1,6 +1,6 @@
-"""Fetchers for Indonesian gold prices (Pegadaian, Treasury). Ported from the
-root project's gold_price.py -- endpoints reverse-engineered from
-iamutaki/logam-mulia-api.
+"""Fetchers for Indonesian gold prices: Pegadaian (JSON API, endpoint
+reverse-engineered from iamutaki/logam-mulia-api) and IndoGold (Antam retail
+price, scraped from its harga-emas-hari-ini page).
 
 Both fetchers return the same normalized shape:
     {"source": str, "sell": float, "buyback": float, "source_updated_at": str}
@@ -9,6 +9,8 @@ with prices in IDR per gram.
 from __future__ import annotations
 
 import json
+import re
+from html import unescape
 
 import requests
 
@@ -19,7 +21,24 @@ BROWSER_UA = (
 HEADERS = {"User-Agent": BROWSER_UA, "Accept": "application/json"}
 
 PEGADAIAN_URL = "https://sahabat.pegadaian.co.id/gold/prices/chart"
-TREASURY_URL = "https://api.treasury.id/api/v1/antigrvty/gold/rate"
+INDOGOLD_URL = "https://www.indogold.id/harga-emas-hari-ini"
+
+_INDOGOLD_PRICE_RE = re.compile(
+    r"Harga Beli Rp ([\d.,]+)/gram, Harga Jual/Buyback Rp ([\d.,]+)/gram"
+)
+_INDOGOLD_DATE_RE = re.compile(
+    r"(?:Senin|Selasa|Rabu|Kamis|Jumat|Jum'?at|Sabtu|Minggu), (\d{1,2}) ([A-Za-z]+) (\d{4})"
+)
+_ID_MONTHS = {
+    name.lower(): i
+    for i, name in enumerate(
+        [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+        ],
+        start=1,
+    )
+}
 
 
 class StalePriceError(RuntimeError):
@@ -74,16 +93,31 @@ def fetch_pegadaian(timeout: int = 30) -> dict:
     }
 
 
-def fetch_treasury(timeout: int = 30) -> dict:
-    resp = requests.post(TREASURY_URL, headers=HEADERS, timeout=timeout)
+def _parse_idr(value: str) -> float:
+    return float(value.replace(".", "").replace(",", "."))
+
+
+def fetch_indogold(timeout: int = 30) -> dict:
+    resp = requests.get(INDOGOLD_URL, headers=HEADERS, timeout=timeout)
     resp.raise_for_status()
-    data = resp.json()["data"]
+    text = unescape(resp.text)
+
+    price = _INDOGOLD_PRICE_RE.search(text)
+    if not price:
+        raise ValueError("indogold: price pattern not found in page")
+
+    date = _INDOGOLD_DATE_RE.search(text)
+    month = _ID_MONTHS.get(date.group(2).lower()) if date else None
+    if not date or month is None:
+        raise ValueError("indogold: page date not found")
+    day, year = int(date.group(1)), int(date.group(3))
+
     return {
-        "source": "treasury",
-        "sell": float(data["buying_rate"]),
-        "buyback": float(data["selling_rate"]),
-        "source_updated_at": data.get("updated_at"),
+        "source": "indogold",
+        "sell": _parse_idr(price.group(1)),
+        "buyback": _parse_idr(price.group(2)),
+        "source_updated_at": f"{year:04d}-{month:02d}-{day:02d}",
     }
 
 
-FETCHERS = {"pegadaian": fetch_pegadaian, "treasury": fetch_treasury}
+FETCHERS = {"pegadaian": fetch_pegadaian, "indogold": fetch_indogold}

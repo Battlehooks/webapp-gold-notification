@@ -78,8 +78,9 @@ Frontend: http://localhost:5173 · Market Data: http://localhost:8001/docs · In
 http://localhost:8002/docs · Notification: http://localhost:3000/health
 
 Give Market Data's ingestion scheduler a few minutes after first startup before
-expecting signals/charts to show real data (BTC/ETH/SOL land within ~1 min; Treasury
-within ~15 min; Pegadaian is once-daily).
+expecting signals/charts to show real data (BTC/ETH/SOL land within ~1 min; IndoGold
+(Antam retail) and Pegadaian are fetched once daily (IndoGold at 09:30 WIB), so their signals need
+several days of history).
 
 `docker compose up` brings up three of the four backend services. The Agent Service is
 **not** included — it's meant to run bare-metal on whatever machine you want it to
@@ -157,8 +158,9 @@ docker compose up -d
 **Price history from the original bot (optional).** Prices are the one thing the web
 app takes from the Telegram bot; users, subscribers, chats and AI analyses stay separate.
 `python scripts/seed_prices_from_bot.py /path/to/gold-notification/gold.db` copies the
-bot's BTC/ETH/SOL/Treasury/Pegadaian history into `market_data.prices` (same endpoints,
-same units). It only adds rows newer than what's already there, so run it once more just
+bot's BTC/ETH/SOL/Pegadaian history into `market_data.prices` (same endpoints,
+same units; the bot only began logging IndoGold on 2026-11-22, and its old Treasury
+rows are not copied). It only adds rows newer than what's already there, so run it once more just
 before starting the services to close the gap; after that Market Data logs its own.
 
 The migration script reads `DATABASE_URL` from `services/.env` (or prompts for it), copies

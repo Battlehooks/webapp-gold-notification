@@ -14,7 +14,9 @@ time per source (previous_price() relies on that). gold.db is only read.
 
 The bot and Market Data fetch the same endpoints with the same
 normalisation (IDR per gram for gold, IDR per coin for crypto), so their rows
-are interchangeable. Connection string: same as migrate_sqlite_to_postgres.py.
+are interchangeable. The bot only switched from Treasury to IndoGold on
+2026-11-22, so there is little IndoGold history to copy, and its old Treasury
+rows are not copied. Connection string: same as migrate_sqlite_to_postgres.py.
 """
 from __future__ import annotations
 
@@ -30,7 +32,7 @@ from migrate_sqlite_to_postgres import _copy_value, _database_url, _python_ddl
 
 SCHEMA = "market_data"
 # Market Data's SOURCE_META keys -- the bot logs more sources than these.
-SOURCES = ["pegadaian", "treasury", "btc", "eth", "sol"]
+SOURCES = ["pegadaian", "indogold", "btc", "eth", "sol"]
 COLUMNS = ["source", "sell", "buyback", "source_updated_at", "fetched_at"]
 
 

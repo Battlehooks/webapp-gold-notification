@@ -12,7 +12,7 @@ LOOKBACK_DAYS = 30
 
 SOURCE_META = {
     "pegadaian": {"display": "Pegadaian", "unit_suffix": "/g"},
-    "treasury": {"display": "Treasury", "unit_suffix": "/g"},
+    "indogold": {"display": "IndoGold (Antam retail)", "unit_suffix": "/g"},
     "btc": {"display": "BTC", "unit_suffix": ""},
     "eth": {"display": "ETH", "unit_suffix": ""},
     "sol": {"display": "SOL", "unit_suffix": ""},
@@ -20,7 +20,7 @@ SOURCE_META = {
 
 GROUPS = {
     "gold": {"sources": ["pegadaian"]},
-    "crypto": {"sources": ["btc", "eth", "sol", "treasury"]},
+    "crypto": {"sources": ["btc", "eth", "sol", "indogold"]},
 }
 
 

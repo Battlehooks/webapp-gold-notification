@@ -18,11 +18,11 @@ GROUPS = {
         "asset_desc": "Indonesian Pegadaian gold price (IDR per gram), sell side",
     },
     "crypto": {
-        "sources": ["btc", "eth", "sol", "treasury"],
-        "title": "Crypto & Treasury trend update",
+        "sources": ["btc", "eth", "sol", "indogold"],
+        "title": "Crypto & Gold trend update",
         "asset_desc": (
             "BTC, ETH, and SOL prices in IDR per coin (Indodax) plus the "
-            "Indonesian Treasury gold price in IDR per gram, sell side -- these "
+            "IndoGold (Antam retail) gold price in IDR per gram, sell side -- these "
             "are different units, compare each source's own % change, not the "
             "raw price levels across sources"
         ),
@@ -31,7 +31,7 @@ GROUPS = {
 
 SOURCE_META = {
     "pegadaian": {"display": "Pegadaian", "unit_suffix": "/g"},
-    "treasury": {"display": "Treasury", "unit_suffix": "/g"},
+    "indogold": {"display": "IndoGold (Antam retail)", "unit_suffix": "/g"},
     "btc": {"display": "BTC", "unit_suffix": ""},
     "eth": {"display": "ETH", "unit_suffix": ""},
     "sol": {"display": "SOL", "unit_suffix": ""},

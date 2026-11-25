@@ -10,7 +10,7 @@ import {
 
 const GROUP_LABELS: Record<string, string> = {
   gold: "Gold (Pegadaian)",
-  crypto: "Crypto & Treasury",
+  crypto: "Crypto & Gold",
 };
 const GROUP_SHORT: Record<string, string> = {
   gold: "Gold",
