@@ -8,6 +8,12 @@ export function fmtPct(value: number | null): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
+/** fmtPct with one decimal, same sign style: "+1.4%" / "-7.5%" / "0.0%". */
+export function fmtPct1(value: number): string {
+  const v = Number(value.toFixed(1));
+  return `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
+}
+
 /** Like fmtPct but with the design's em-dash placeholder. */
 export function fmtPctOrDash(value: number | null | undefined): string {
   return value == null ? "—" : fmtPct(value);

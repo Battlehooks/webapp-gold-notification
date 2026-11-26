@@ -1,7 +1,7 @@
 // Plain-data derivations shared by the web and phone layouts. Nothing here
 // decides a signal -- signals always come from market-data's rule engine.
-import type { AnalysisRun, PricePoint } from "./api";
-import { fmtJakarta, fmtJakartaTime, fmtPct, fmtQty, fmtRp, ordinal, parseUtc } from "./format";
+import type { AnalysisRun, Decomposition, PricePoint } from "./api";
+import { fmtJakarta, fmtJakartaTime, fmtPct, fmtPct1, fmtQty, fmtRp, ordinal, parseUtc } from "./format";
 import { holdingUnit, type Holding } from "./holdings";
 import type { Asset } from "./useMarket";
 import type { SeriesMap } from "./useSeries";
@@ -177,6 +177,33 @@ export function lastPointTime(points: PricePoint[] | undefined): string | null {
 export function priceStr(asset: Asset, value?: number): string {
   const v = value ?? asset.stats?.latest_sell_idr;
   return v == null ? "—" : fmtRp(v) + asset.meta.unit_suffix;
+}
+
+export interface GoldVsRupiahLine {
+  window: "7d" | "30d";
+  text: string;
+}
+
+const DECOMPOSITION_WINDOWS = ["7d", "30d"] as const;
+
+/** Display sentence for the USD/IDR move; the API numbers are shown, not judged. */
+function rupiahVsUsd(usdidrPct: number): string {
+  if (Math.abs(usdidrPct) < 0.05) return "rupiah flat vs USD";
+  const size = `${Math.abs(usdidrPct).toFixed(1)}%`;
+  return usdidrPct > 0 ? `rupiah weaker ${size} vs USD` : `rupiah stronger ${size} vs USD`;
+}
+
+/** One line per window that has data; nothing for null windows. */
+export function goldVsRupiahLines(d: Decomposition | null): GoldVsRupiahLine[] {
+  if (!d) return [];
+  return DECOMPOSITION_WINDOWS.flatMap((w) => {
+    const win = d.windows[w];
+    if (!win) return [];
+    const text =
+      `${w}: ${fmtPct1(win.idr_pct)} in rupiah = ${fmtPct1(win.gold_usd_pct)} gold in USD · ` +
+      rupiahVsUsd(win.usdidr_pct);
+    return [{ window: w, text }];
+  });
 }
 
 /** Caption under the portfolio chart. */

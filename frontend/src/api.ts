@@ -40,6 +40,28 @@ export interface GroupSignalsResponse {
   sources: Record<string, SignalStats>;
 }
 
+export interface DecompositionWindow {
+  base_date: string;
+  /** % change of the gold price in rupiah. */
+  idr_pct: number;
+  /** % change of gold priced in dollars (gold_idr / usdidr). */
+  gold_usd_pct: number;
+  /** % change of USD/IDR; positive means the rupiah weakened. */
+  usdidr_pct: number;
+}
+
+/** Gold price move split into "gold itself" vs "rupiah" (market-data). */
+export interface Decomposition {
+  source: string;
+  fx_source: string;
+  as_of: string | null;
+  latest: { gold_idr: number; usdidr: number; gold_usd: number } | null;
+  windows: {
+    "7d": DecompositionWindow | null;
+    "30d": DecompositionWindow | null;
+  };
+}
+
 export interface AnalysisRun {
   group_name: string;
   created_at: string;
@@ -68,6 +90,7 @@ export const marketData = {
     ),
   groupSignals: (group: string, days = 30) =>
     getJson<GroupSignalsResponse>(`${MARKET_DATA_URL}/signals?group=${group}&days=${days}`),
+  decomposition: (source: string) => getJson<Decomposition>(`${MARKET_DATA_URL}/decomposition/${source}`),
 };
 
 export const insight = {

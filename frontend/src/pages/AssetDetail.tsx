@@ -3,10 +3,11 @@ import { useApp } from "../appContext";
 import { PriceArea } from "../components/PriceArea";
 import { SignalTag } from "../components/SignalTag";
 import { fmtJakarta, fmtJakartaTime, fmtPctOrDash, fmtRp, fmtRpSigned, ordinal } from "../format";
-import { lastPointTime, narrationFor, priceStr } from "../model";
+import { goldVsRupiahLines, lastPointTime, narrationFor, priceStr } from "../model";
 import { changeColor, SIG } from "../signal";
 import { groupLabel } from "../useMarket";
 import { go } from "../useRoute";
+import { useDecomposition } from "../useDecomposition";
 import { useSeries } from "../useSeries";
 
 const RANGES = [7, 30, 90] as const;
@@ -15,6 +16,7 @@ export function AssetDetail({ source, phone, onBack }: { source: string; phone?:
   const { market, positions, openAsk } = useApp();
   const [range, setRange] = useState<(typeof RANGES)[number]>(30);
   const points = useSeries(source, range, 300);
+  const decomp = useDecomposition(source, market.bySource[source]?.meta.unit_suffix);
 
   const asset = market.bySource[source];
   const back = (
@@ -103,6 +105,17 @@ export function AssetDetail({ source, phone, onBack }: { source: string; phone?:
       </p>
     </div>
   );
+  const gvrLines = goldVsRupiahLines(decomp);
+  const goldVsRupiah = gvrLines.length > 0 && (
+    <div className={phone ? "card" : "card elev-sm"} style={{ padding: phone ? 14 : 18, gap: phone ? 8 : 10 }}>
+      <div className="card-kicker">Gold vs rupiah</div>
+      {gvrLines.map((line) => (
+        <p key={line.window} className="why-text" style={{ fontSize: phone ? 14 : 15 }}>
+          {line.text}
+        </p>
+      ))}
+    </div>
+  );
   const votes = (
     <div className={phone ? "card" : "card elev-sm"} style={{ padding: phone ? 14 : 18, gap: phone ? 10 : 12 }}>
       <div className="card-kicker">Model votes</div>
@@ -162,6 +175,7 @@ export function AssetDetail({ source, phone, onBack }: { source: string; phone?:
           ))}
         </div>
         {why}
+        {goldVsRupiah}
         {votes}
         {position}
         <button className="btn btn-primary" onClick={() => openAsk(askQuestion)}>
@@ -226,6 +240,7 @@ export function AssetDetail({ source, phone, onBack }: { source: string; phone?:
 
       <div className="detail-cards">
         {why}
+        {goldVsRupiah}
         {votes}
         {position}
       </div>

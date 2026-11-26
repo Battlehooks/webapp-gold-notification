@@ -11,10 +11,12 @@ import {
 const GROUP_LABELS: Record<string, string> = {
   gold: "Gold (Pegadaian)",
   crypto: "Crypto & Gold",
+  fx: "USD (USDT/IDR)",
 };
 const GROUP_SHORT: Record<string, string> = {
   gold: "Gold",
   crypto: "Crypto",
+  fx: "USD",
 };
 
 export const groupLabel = (g: string) => GROUP_LABELS[g] ?? g;
