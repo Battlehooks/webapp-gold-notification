@@ -16,12 +16,24 @@ SOURCE_META = {
     "btc": {"display": "BTC", "unit_suffix": ""},
     "eth": {"display": "ETH", "unit_suffix": ""},
     "sol": {"display": "SOL", "unit_suffix": ""},
+    "usdt": {"display": "USD (USDT/IDR)", "unit_suffix": ""},
 }
 
 GROUPS = {
     "gold": {"sources": ["pegadaian"]},
     "crypto": {"sources": ["btc", "eth", "sol", "indogold"]},
+    "fx": {"sources": ["usdt"]},
 }
+
+# Gold-in-IDR sources that the gold-vs-rupiah decomposition accepts, the FX
+# source used as the USD/IDR stand-in, and the look-back windows (days).
+GOLD_SOURCES = ("pegadaian", "indogold")
+DECOMPOSITION_FX_SOURCE = "usdt"
+DECOMPOSITION_WINDOWS_DAYS = (7, 30)
+
+DEFAULT_PRICE_VS_AVG_THRESHOLD_PCT = 3.0
+# Per-source override of the +-% band for the price-vs-30d-average vote.
+PRICE_VS_AVG_THRESHOLD_PCT = {"usdt": 1.0}
 
 
 def load_frame(conn: sqlite3.Connection, sources: list[str], days: int = LOOKBACK_DAYS) -> pd.DataFrame:
@@ -49,10 +61,12 @@ def _rsi(returns: pd.Series, window: int = 14) -> float | None:
     return round(100 - 100 / (1 + rs), 1)
 
 
-def compute_rule_signal(s: dict) -> dict:
+def compute_rule_signal(s: dict, source: str | None = None) -> dict:
     """Deterministic BUY/SELL/WAIT from already-computed indicators. Three
     independent +-1 votes (RSI, 30d percentile rank, price vs 30d average).
-    Score >=2 -> BUY, <=-2 -> SELL, otherwise WAIT."""
+    Score >=2 -> BUY, <=-2 -> SELL, otherwise WAIT. The price-vs-average band
+    depends on `source` (see PRICE_VS_AVG_THRESHOLD_PCT)."""
+    threshold = PRICE_VS_AVG_THRESHOLD_PCT.get(source, DEFAULT_PRICE_VS_AVG_THRESHOLD_PCT)
     score = 0
     reasons: list[str] = []
     available = 0
@@ -68,10 +82,10 @@ def compute_rule_signal(s: dict) -> dict:
 
     if s["price_vs_avg30_pct"] is not None:
         available += 1
-        if s["price_vs_avg30_pct"] <= -3:
+        if s["price_vs_avg30_pct"] <= -threshold:
             score += 1
             reasons.append(f"{abs(s['price_vs_avg30_pct']):.1f}% below its 30d average")
-        elif s["price_vs_avg30_pct"] >= 3:
+        elif s["price_vs_avg30_pct"] >= threshold:
             score -= 1
             reasons.append(f"{s['price_vs_avg30_pct']:.1f}% above its 30d average")
 
@@ -147,9 +161,73 @@ def compute_stats(df: pd.DataFrame) -> dict:
                 else None
             ),
         }
-        s.update(compute_rule_signal(s))
+        s.update(compute_rule_signal(s, source))
         stats[source] = s
     return stats
+
+
+def daily_closes(df: pd.DataFrame, source: str) -> pd.Series:
+    """Per-day last `sell` of one source from a load_frame() result. Same
+    resample as compute_stats. Empty Series if the source has no rows."""
+    grp = df[df["source"] == source]
+    if grp.empty:
+        return pd.Series(dtype="float64")
+    return grp.set_index("fetched_at")["sell"].resample("D").last().dropna()
+
+
+def compute_decomposition(
+    gold_daily: pd.Series,
+    fx_daily: pd.Series,
+    windows_days: tuple[int, ...] = DECOMPOSITION_WINDOWS_DAYS,
+) -> dict:
+    """Split a gold-in-IDR move into 'gold itself' (priced in USD) and 'rupiah'
+    (USD/IDR). Identity: (1 + idr_pct/100) = (1 + gold_usd_pct/100) *
+    (1 + usdidr_pct/100). It is multiplicative, not additive.
+
+    Days present in only one series are skipped (inner join). Days with a
+    non-positive or non-finite price are skipped too, so every division is safe.
+    """
+    empty = {
+        "as_of": None,
+        "latest": None,
+        "windows": {f"{n}d": None for n in windows_days},
+    }
+    if gold_daily.empty or fx_daily.empty:
+        return empty
+
+    aligned = pd.DataFrame({"gold": gold_daily, "fx": fx_daily})
+    aligned = aligned[((aligned > 0) & (aligned < float("inf"))).all(axis=1)]
+    if len(aligned) < 2:
+        return empty
+    aligned = aligned.sort_index()
+
+    latest_day = aligned.index[-1]
+    g1 = float(aligned["gold"].iloc[-1])
+    u1 = float(aligned["fx"].iloc[-1])
+    gold_usd1 = g1 / u1
+    result = {
+        "as_of": latest_day.date().isoformat(),
+        "latest": {"gold_idr": g1, "usdidr": u1, "gold_usd": round(gold_usd1, 2)},
+        "windows": {},
+    }
+
+    for n in windows_days:
+        cutoff = latest_day - pd.Timedelta(days=n)
+        past = aligned[aligned.index <= cutoff]
+        if past.empty:
+            result["windows"][f"{n}d"] = None
+            continue
+        base_day = past.index[-1]
+        g0 = float(past["gold"].iloc[-1])
+        u0 = float(past["fx"].iloc[-1])
+        gold_usd0 = g0 / u0
+        result["windows"][f"{n}d"] = {
+            "base_date": base_day.date().isoformat(),
+            "idr_pct": round((g1 / g0 - 1) * 100, 2),
+            "gold_usd_pct": round((gold_usd1 / gold_usd0 - 1) * 100, 2),
+            "usdidr_pct": round((u1 / u0 - 1) * 100, 2),
+        }
+    return result
 
 
 def detect_sudden_move(

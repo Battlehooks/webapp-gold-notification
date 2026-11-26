@@ -61,6 +61,29 @@ def insert_price(conn: sqlite3.Connection, price: dict) -> None:
     conn.commit()
 
 
+def insert_price_at(conn: sqlite3.Connection, price: dict, fetched_at: str) -> None:
+    conn.execute(
+        "INSERT INTO prices (source, sell, buyback, source_updated_at, fetched_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            price["source"],
+            price["sell"],
+            price["buyback"],
+            price.get("source_updated_at"),
+            fetched_at,
+        ),
+    )
+    conn.commit()
+
+
+def price_days_present(conn: sqlite3.Connection, source: str) -> set[str]:
+    rows = conn.execute(
+        "SELECT DISTINCT substr(fetched_at, 1, 10) AS d FROM prices WHERE source = ?",
+        (source,),
+    ).fetchall()
+    return {row["d"] for row in rows}
+
+
 def previous_price(conn: sqlite3.Connection, source: str) -> sqlite3.Row | None:
     return conn.execute(
         "SELECT * FROM prices WHERE source = ? ORDER BY id DESC LIMIT 1",

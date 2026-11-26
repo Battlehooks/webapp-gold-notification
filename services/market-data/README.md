@@ -30,3 +30,6 @@ one data point.
 | GET | `/signals?group=crypto\|gold&days=30` | Stats + signal for every source in a group |
 | GET | `/latest` | Newest stored sell *and* buyback per source (the Notification service's push alerts judge profit at buyback) |
 | GET | `/sudden-move-check` | Biggest BTC/ETH/SOL move right now if ≥5% in the last hour, else `null`. Stateless — the caller (Notification service) tracks cooldown. |
+| GET | `/decomposition/{source}?days=60` | Splits a gold (`pegadaian` or `indogold`) IDR move into gold-in-USD vs rupiah, using the `usdt` source (USDT/IDR) as the USD/IDR stand-in. Windows `7d` and `30d`; `null` when history is too short. `days` is 8–120. |
+
+The `usdt` source (USDT/IDR from Indodax) is in the `fx` group. It is used by the decomposition endpoint, not by the crypto group.

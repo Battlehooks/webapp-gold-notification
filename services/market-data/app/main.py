@@ -117,6 +117,32 @@ def signals_for_group(group: str, days: int = 30):
         conn.close()
 
 
+@app.get("/decomposition/{source}")
+def decomposition(source: str, days: int = Query(60, ge=8, le=120)):
+    """Splits a gold-in-IDR move into 'gold itself' (priced in USD) and 'rupiah'
+    (USD/IDR, using the `usdt` source as the stand-in).
+
+    Identity: (1 + idr_pct/100) = (1 + gold_usd_pct/100) * (1 + usdidr_pct/100).
+    It is multiplicative, not additive. usdidr_pct > 0 means the rupiah got
+    weaker versus the dollar.
+    """
+    if source not in signals.GOLD_SOURCES:
+        raise HTTPException(
+            404,
+            f"unknown gold source {source!r}, expected one of {list(signals.GOLD_SOURCES)}",
+        )
+    conn = db.connect()
+    try:
+        fx = signals.DECOMPOSITION_FX_SOURCE
+        df = signals.load_frame(conn, [source, fx], days=days)
+        result = signals.compute_decomposition(
+            signals.daily_closes(df, source), signals.daily_closes(df, fx)
+        )
+        return {"source": source, "fx_source": fx, **result}
+    finally:
+        conn.close()
+
+
 @app.get("/latest")
 def latest():
     """Newest stored price per source, sell *and* buyback. The signal stats

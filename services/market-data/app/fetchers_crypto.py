@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import requests
 
 INDODAX_URL = "https://indodax.com/api/ticker/{pair}"
-PAIRS = {"btc": "btcidr", "eth": "ethidr", "sol": "solidr"}
+PAIRS = {"btc": "btcidr", "eth": "ethidr", "sol": "solidr", "usdt": "usdtidr"}
 
 
 def _fetch(name: str, timeout: int = 30) -> dict:
@@ -36,4 +36,8 @@ def fetch_sol(timeout: int = 30) -> dict:
     return _fetch("sol", timeout)
 
 
-FETCHERS = {"btc": fetch_btc, "eth": fetch_eth, "sol": fetch_sol}
+def fetch_usdt(timeout: int = 30) -> dict:
+    return _fetch("usdt", timeout)
+
+
+FETCHERS = {"btc": fetch_btc, "eth": fetch_eth, "sol": fetch_sol, "usdt": fetch_usdt}
