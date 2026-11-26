@@ -27,6 +27,20 @@ GROUPS = {
             "raw price levels across sources"
         ),
     },
+    "fx": {
+        "sources": ["usdt"],
+        "title": "Daily USD/IDR (rupiah) update",
+        "asset_desc": (
+            "the USDT/IDR price on Indodax, in IDR per 1 USDT, used as a stand-in "
+            "for the USD/IDR exchange rate -- a higher price means the rupiah is "
+            "weaker against the US dollar, a lower price means the rupiah is "
+            "relatively strong. A BUY signal here means buying US dollars with "
+            "rupiah looks relatively cheap versus the last 30 days, SELL means the "
+            "dollar looks expensive versus its own 30-day range, and WAIT is "
+            "neutral. This is about the exchange rate only, not a call on gold or "
+            "crypto. USDT is a stablecoin, so daily moves of 1% are already large"
+        ),
+    },
 }
 
 SOURCE_META = {
@@ -35,6 +49,7 @@ SOURCE_META = {
     "btc": {"display": "BTC", "unit_suffix": ""},
     "eth": {"display": "ETH", "unit_suffix": ""},
     "sol": {"display": "SOL", "unit_suffix": ""},
+    "usdt": {"display": "USD (USDT/IDR)", "unit_suffix": ""},
 }
 
 SIGNAL_EMOJI = {"BUY": "\U0001f7e2", "SELL": "\U0001f534", "WAIT": "\U0001f7e1"}

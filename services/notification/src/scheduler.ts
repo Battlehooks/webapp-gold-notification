@@ -2,7 +2,7 @@
  * The service's clock. Two jobs:
  *
  *  - Narration: has Insight write the routine AI analysis the dashboard
- *    shows (crypto every 4h, gold daily) -- ported from the root project's
+ *    shows (crypto every 4h, gold and fx daily) -- ported from the root project's
  *    trend_summary.py cron entrypoints, now in-process via node-cron.
  *  - Alerts (alerts.ts): holdings P/L every minute, signal flips and sudden
  *    moves every 5 minutes, delivered as Web Push to every browser that
@@ -56,11 +56,12 @@ function every(expr: string, name: string, job: () => Promise<void>): void {
 export function start(): void {
   every("0 */4 * * *", "crypto narration", () => runNarration("crypto"));
   every("30 23 * * *", "gold narration", () => runNarration("gold"));
+  every("35 23 * * *", "fx narration", () => runNarration("fx"));
   every("*/5 * * * *", "sudden-move check", checkSuddenMove);
   every("*/5 * * * *", "signal check", alerts.checkSignals);
   every("* * * * *", "holdings check", alerts.checkPositions);
   console.log(
-    "scheduler started: narration crypto=4h gold=daily@23:30 UTC; alerts holdings=1min signals+sudden-move=5min"
+    "scheduler started: narration crypto=4h gold=daily@23:30 UTC fx=daily@23:35 UTC; alerts holdings=1min signals+sudden-move=5min"
   );
 }
 

@@ -16,7 +16,7 @@ import * as marketData from "./marketDataClient.js";
 import * as push from "./push.js";
 
 const REARM_POINTS = 1;
-const GROUPS = ["crypto", "gold"];
+const GROUPS = ["crypto", "gold", "fx"];
 
 let meta: marketData.SourcesResponse["sources"] = {};
 let metaAt = 0;

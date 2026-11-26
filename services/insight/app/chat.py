@@ -25,7 +25,7 @@ from app.config import (
 )
 from app.narration import GROUPS
 
-SOURCES = ["pegadaian", "indogold", "btc", "eth", "sol"]
+SOURCES = ["pegadaian", "indogold", "btc", "eth", "sol", "usdt"]
 TOOL_NAMES = {"get_latest_analysis", "get_price_stats", "search_news"}
 
 SYSTEM_PROMPT = (
