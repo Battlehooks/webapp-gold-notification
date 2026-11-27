@@ -2,6 +2,10 @@ node_modules/
 .venv/
 
 .env
+# Every real env file stays out of git (.env.local, .env.production, .env.services, ...).
+# Only the .env.example templates are tracked.
+.env.*
+!.env.example
 
 *.db
 *.db-journal
