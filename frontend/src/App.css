@@ -211,7 +211,9 @@
 }
 .phone-tabs button i { font-size: 22px; }
 .phone-tabs button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-.phone-header { display: flex; justify-content: space-between; align-items: center; }
+.phone-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.phone-brand-group { display: grid; gap: 2px; }
+.phone-brand-group .meta-text { font-size: 11px; }
 .phone-brand { display: flex; align-items: center; gap: 6px; font-weight: 500; }
 .phone-title { font-size: 22px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
 .phone-total { font-size: 30px; font-weight: 500; letter-spacing: -0.02em; }
@@ -309,4 +311,37 @@
 @media (max-width: 720px) {
   .holding-row { grid-template-columns: 1fr 1fr; }
   .holding-row .field:first-child { grid-column: 1 / -1; }
+}
+
+.account-dialog {
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow: auto;
+  border: 1px solid var(--color-divider);
+  color: var(--color-text);
+}
+
+.account-dialog::backdrop {
+  background: rgb(0 0 0 / 65%);
+}
+
+.account-form {
+  display: grid;
+  gap: 12px;
+}
+
+.account-form .dialog-body {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.account-form .input,
+.account-form .btn,
+.phone-account {
+  min-height: 44px;
+}
+
+.account-switch {
+  justify-self: start;
 }

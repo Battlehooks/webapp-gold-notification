@@ -3,6 +3,7 @@
  *   - push_devices: one row per browser that turned on alerts -- its Web Push
  *     subscription, the holdings and alert rules it asked to be watched, and
  *     per-device alert memory (which thresholds have already fired).
+ *   - accounts and account_sessions: personal portfolios and sign-in sessions.
  *   - alert_state: small global key/value memory (sudden-move cooldown, the
  *     last signal seen per source).
  * No price or analysis data lives here -- those are reached over HTTP from
@@ -32,6 +33,19 @@ CREATE TABLE IF NOT EXISTS push_devices (
   state TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS accounts (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  holdings TEXT NOT NULL DEFAULT '[]',
+  revision INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS account_sessions (
+  token_hash TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS account_sessions_expiry ON account_sessions(expires_at);
 `;
 
 if (config.databaseUrl && !/^[a-z_][a-z0-9_]*$/.test(config.dbSchema)) {
@@ -217,4 +231,51 @@ export async function saveDeviceState(deviceId: string, state: Record<string, bo
 
 export async function deleteDevice(deviceId: string): Promise<boolean> {
   return (await run("DELETE FROM push_devices WHERE device_id = ?", deviceId)) > 0;
+}
+
+interface AccountRow {
+  id: string;
+  email: string;
+  holdings: string;
+  revision: number;
+  password_hash: string;
+}
+
+export async function createAccount(id: string, email: string, passwordHash: string): Promise<boolean> {
+  return (await run(
+    "INSERT INTO accounts (id, email, password_hash) VALUES (?, ?, ?) ON CONFLICT(email) DO NOTHING",
+    id, email, passwordHash
+  )) === 1;
+}
+
+export async function accountByEmail(email: string): Promise<AccountRow | undefined> {
+  return (await all<AccountRow>("SELECT * FROM accounts WHERE email = ?", email))[0];
+}
+
+export async function accountForSession(tokenHash: string): Promise<Omit<AccountRow, "password_hash"> | undefined> {
+  return (await all<Omit<AccountRow, "password_hash">>(
+    `SELECT a.id, a.email, a.holdings, a.revision FROM accounts a
+     JOIN account_sessions s ON s.account_id = a.id WHERE s.token_hash = ? AND s.expires_at > ?`,
+    tokenHash, new Date().toISOString()
+  ))[0];
+}
+
+export async function createSession(tokenHash: string, accountId: string, expires: Date): Promise<void> {
+  await run("DELETE FROM account_sessions WHERE expires_at <= ?", new Date().toISOString());
+  await run("INSERT INTO account_sessions (token_hash, account_id, expires_at) VALUES (?, ?, ?)",
+    tokenHash, accountId, expires.toISOString());
+}
+
+export async function deleteSession(tokenHash: string): Promise<void> {
+  await run("DELETE FROM account_sessions WHERE token_hash = ?", tokenHash);
+}
+
+export async function savePortfolio(
+  id: string, revision: number, holdings: PushHolding[], tokenHash: string
+): Promise<boolean> {
+  return (await run(
+    `UPDATE accounts SET holdings = ?, revision = revision + 1 WHERE id = ? AND revision = ?
+     AND EXISTS (SELECT 1 FROM account_sessions WHERE token_hash = ? AND account_id = accounts.id AND expires_at > ?)`,
+    JSON.stringify(holdings), id, String(revision), tokenHash, new Date().toISOString()
+  )) === 1;
 }

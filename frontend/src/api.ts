@@ -1,6 +1,6 @@
 const MARKET_DATA_URL = import.meta.env.VITE_MARKET_DATA_URL || "http://localhost:8001";
 const INSIGHT_URL = import.meta.env.VITE_INSIGHT_URL || "http://localhost:8002";
-const NOTIFICATION_URL = import.meta.env.VITE_NOTIFICATION_URL || "http://localhost:3000";
+export const NOTIFICATION_URL = import.meta.env.VITE_NOTIFICATION_URL || "http://localhost:3000";
 const AGENT_URL = import.meta.env.VITE_AGENT_URL || "http://localhost:8003";
 
 export interface SourceMeta {

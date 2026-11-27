@@ -1,5 +1,5 @@
 """One-off: copy every service's SQLite data into its schema of the shared
-Postgres database (DATABASE_URL in services/.env).
+Postgres database (DATABASE_URL in .env).
 
 Run it once, with the services stopped, before starting them with
 DATABASE_URL set -- see "Moving to Postgres" in README.md.
@@ -21,7 +21,7 @@ Refuses to write into a schema that already has rows (so it can't clobber a
 live database with stale SQLite data) unless --reset, which empties that
 service's tables first. SQLite files are only ever read.
 
-The connection string is DATABASE_URL from services/.env (the file every
+The connection string is DATABASE_URL from .env (the file every
 service reads), or $DATABASE_URL; failing both it's prompted for, so the
 password never has to go on the command line. Needs `pip install
 psycopg2-binary`.
@@ -45,10 +45,10 @@ SERVICES = ROOT / "services"
 
 
 def _database_url() -> str:
-    """$DATABASE_URL, else DATABASE_URL from services/.env, else a prompt."""
+    """$DATABASE_URL, else DATABASE_URL from .env, else a prompt."""
     if os.environ.get("DATABASE_URL"):
         return os.environ["DATABASE_URL"]
-    shared = SERVICES / ".env"
+    shared = ROOT / ".env"
     if shared.exists():
         for line in shared.read_text(encoding="utf-8").splitlines():
             key, sep, value = line.strip().partition("=")
@@ -125,21 +125,31 @@ def migrate_service(pg, schema: str, sqlite_path: Path, ddl: str, reset: bool) -
             pg.rollback()
             print(f"  REFUSING: {schema} already has data: {', '.join(occupied)}. Re-run with --reset to replace it.")
             return False
+        truncate_tables = list(pg_tables)
+        if "accounts" in pg_tables:
+            # Sessions reference accounts. PostgreSQL must truncate both together.
+            if "account_sessions" not in truncate_tables:
+                truncate_tables.append("account_sessions")
+            pg_tables.sort(key=lambda t: t == "account_sessions")
+        if truncate_tables:
+            cur.execute(f"TRUNCATE {', '.join(truncate_tables)}")
         ok = True
         for t in pg_tables:
             cols = [c for c in _pg_columns(cur, schema, t) if c in {r[1] for r in lite.execute(f"PRAGMA table_info({t})")}]
             rows = lite.execute(f"SELECT {', '.join(cols)} FROM {t}").fetchall()
-            cur.execute(f"TRUNCATE {t}")
             buf = io.StringIO()
             for row in rows:
                 buf.write("\t".join(_copy_value(v) for v in row) + "\n")
             buf.seek(0)
             cur.copy_expert(f"COPY {t} ({', '.join(cols)}) FROM STDIN", buf)
             if "id" in cols:
-                cur.execute(
-                    f"SELECT setval(pg_get_serial_sequence('{schema}.{t}', 'id'), "
-                    f"COALESCE((SELECT MAX(id) FROM {t}), 1), (SELECT MAX(id) FROM {t}) IS NOT NULL)"
-                )
+                cur.execute("SELECT pg_get_serial_sequence(%s, 'id')", (f"{schema}.{t}",))
+                sequence = cur.fetchone()[0]
+                if sequence:
+                    cur.execute(
+                        f"SELECT setval(%s, COALESCE(MAX(id), 1), MAX(id) IS NOT NULL) FROM {t}",
+                        (sequence,),
+                    )
             cur.execute(f"SELECT COUNT(*) FROM {t}")
             copied = cur.fetchone()[0]
             match = copied == len(rows)

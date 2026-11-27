@@ -6,6 +6,11 @@ import type { Market } from "./useMarket";
 
 export interface AppCtx {
   market: Market;
+  signedIn: boolean;
+  openAccount: () => void;
+  lots: Holding[];
+  guestLots: Holding[];
+  saveLots: (lots: Holding[]) => Promise<void>;
   holdings: Holding[];
   positions: Position[];
   held: Set<string>;

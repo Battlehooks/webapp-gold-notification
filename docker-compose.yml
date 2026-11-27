@@ -1,10 +1,10 @@
-# Secrets come from services/.env (copy services/.env.example), the same file
+# Secrets come from .env (copy .env.example), the same file
 # the services read when run standalone. Everything under `environment:` is
 # compose-specific wiring and wins over that file; every other setting has a
 # default in the service's own config.
 x-shared-env: &shared-env
   env_file:
-    - path: ./services/.env
+    - path: ./.env
       required: false
 
 services:
@@ -16,7 +16,7 @@ services:
     volumes:
       - market_data_db:/app/data
     environment:
-      # Used only while DATABASE_URL (services/.env) is blank.
+      # Used only while DATABASE_URL (.env) is blank.
       MARKET_DATA_DB_PATH: /app/data/market_data.db
       DB_SCHEMA: market_data
       GOLD_TZ: Asia/Jakarta

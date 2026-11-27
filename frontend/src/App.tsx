@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
+import { accounts, AccountError, type Account } from "./accounts";
 import { syncAlerts, useAlerts } from "./alerts";
 import { AppContext, useApp, type AppCtx } from "./appContext";
+import { AccountDialog } from "./components/AccountDialog";
 import { AlertsDialog } from "./components/AlertsDialog";
 import { AskPanel } from "./components/AskPanel";
 import { HoldingsDialog } from "./components/HoldingsDialog";
 import { fmtJakarta } from "./format";
-import { useHoldings } from "./holdings";
+import { mergeLots, saveHoldings, useHoldingLots, type Holding } from "./holdings";
 import { holdingsContext, latestRunTime, OVERVIEW_CHIPS, positions as toPositions } from "./model";
 import { AgentChat } from "./pages/AgentChat";
 import { AssetDetail } from "./pages/AssetDetail";
@@ -18,12 +20,86 @@ import { useMarket } from "./useMarket";
 import { go, useRoute } from "./useRoute";
 
 export default function App() {
+  const [account, setAccount] = useState<Account | null | undefined>(undefined);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const requestId = useRef(0);
+  const accountChannel = useRef<BroadcastChannel | null>(null);
+  const invalidateRefresh = useCallback(() => { requestId.current++; }, []);
+  const refresh = useCallback(() => {
+    const id = ++requestId.current;
+    void accounts.current().then(({ account }) => {
+      if (id === requestId.current) setAccount((previous) =>
+        account && previous?.id === account.id && previous.revision > account.revision ? previous : account);
+    }).catch(() => {
+      if (id === requestId.current) setAccount((previous) => previous === undefined ? null : previous);
+    });
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    window.addEventListener("focus", refresh);
+    const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("gold-notification-account");
+    if (channel) channel.onmessage = refresh;
+    accountChannel.current = channel;
+    return () => {
+      invalidateRefresh();
+      window.removeEventListener("focus", refresh);
+      channel?.close();
+      accountChannel.current = null;
+    };
+  }, [invalidateRefresh, refresh]);
+
+  function changeAccount(next: Account | null) {
+    invalidateRefresh();
+    setAccount(next);
+    accountChannel.current?.postMessage("session-changed");
+  }
+
+  async function saveLots(lots: Holding[]) {
+    if (!account) {
+      saveHoldings(lots);
+      return;
+    }
+    try {
+      const saved = await accounts.save(account, lots);
+      setAccount((current) => current?.id === account.id && current.revision <= saved.revision
+        ? { ...current, ...saved }
+        : current);
+      accountChannel.current?.postMessage("portfolio-changed");
+    } catch (error) {
+      if (error instanceof AccountError && (error.status === 409 || error.status === 401)) refresh();
+      throw error;
+    }
+  }
+
+  if (account === undefined) {
+    return <main className="app"><p role="status">Loading your dashboard?</p></main>;
+  }
+
+  return (
+    <>
+      <Dashboard key={account?.id ?? "guest"} account={account} saveLots={saveLots} openAccount={() => setAccountOpen(true)} />
+      {accountOpen && <AccountDialog account={account} onChange={changeAccount}
+        onClose={() => setAccountOpen(false)} refresh={refresh} />}
+    </>
+  );
+}
+
+interface DashboardProps {
+  account: Account | null;
+  saveLots: (lots: Holding[]) => Promise<void>;
+  openAccount: () => void;
+}
+
+function Dashboard({ account, saveLots, openAccount }: DashboardProps) {
   const route = useRoute();
   const isPhone = useIsPhone();
   const market = useMarket();
-  const holdings = useHoldings();
+  const guestLots = useHoldingLots();
+  const lots = account?.lots ?? guestLots;
+  const holdings = useMemo(() => mergeLots(lots), [lots]);
   const positions = toPositions(holdings, market.bySource);
-  const ask = useAsk(() => holdingsContext(positions));
+  const ask = useAsk(() => holdingsContext(positions), !!account);
   const [askOpen, setAskOpen] = useState(false);
   const [holdingsOpen, setHoldingsOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -32,11 +108,16 @@ export default function App() {
   // While alerts are on, the server checks holdings for take-profit/stop-loss,
   // so its copy follows every edit (and is refreshed once per visit).
   useEffect(() => {
-    if (alertStatus === "on") void syncAlerts(holdings);
-  }, [holdings, alertStatus]);
+    if (!account && alertStatus === "on") void syncAlerts(holdings);
+  }, [holdings, alertStatus, account]);
 
   const ctx: AppCtx = {
     market,
+    signedIn: !!account,
+    openAccount,
+    lots,
+    guestLots,
+    saveLots,
     holdings,
     positions,
     held: new Set(positions.map((p) => p.holding.source)),
@@ -99,7 +180,7 @@ export default function App() {
 }
 
 function WebNav({ page, onAsk, onAlerts }: { page: "home" | "agent"; onAsk: () => void; onAlerts: () => void }) {
-  const { market } = useApp();
+  const { market, signedIn, openAccount } = useApp();
   const alertsOn = useAlerts().status === "on";
   const updated = latestRunTime(market.runs);
   return (
@@ -117,9 +198,13 @@ function WebNav({ page, onAsk, onAlerts }: { page: "home" | "agent"; onAsk: () =
       <span className="meta-text">
         {updated ? `Updated ${fmtJakarta(updated)}` : market.groups.every((g) => market.runs[g]) && market.groups.length ? "No runs yet" : ""}
       </span>
-      <button className="btn btn-secondary" onClick={onAlerts} aria-label={alertsOn ? "Alerts (on)" : "Alerts"}>
+      {!signedIn && <button className="btn btn-secondary" onClick={onAlerts} aria-label={alertsOn ? "Alerts (on)" : "Alerts"}>
         <i className={alertsOn ? "ph-fill ph-bell-ringing" : "ph ph-bell"} />
         Alerts
+      </button>}
+      <button className="btn btn-secondary" onClick={openAccount}>
+        <i className="ph ph-user-circle" aria-hidden="true" />
+        {signedIn ? "Account" : "Sign in"}
       </button>
       <button className="btn btn-primary" onClick={onAsk}>
         <i className="ph ph-sparkle" />

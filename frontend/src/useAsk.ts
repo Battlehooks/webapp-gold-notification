@@ -31,7 +31,8 @@ export interface Ask {
 }
 
 /** `getContext` supplies the per-turn holdings text sent alongside the question. */
-export function useAsk(getContext: () => string): Ask {
+export function useAsk(getContext: () => string, signedIn: boolean): Ask {
+  const [privateChatId] = useState(() => signedIn ? `web-${crypto.randomUUID()}` : null);
   const [msgs, setMsgs] = useState<AskMessage[]>([]);
   const [pending, setPending] = useState(false);
 
@@ -42,14 +43,14 @@ export function useAsk(getContext: () => string): Ask {
       setMsgs((m) => [...m, { role: "user", text: q }]);
       setPending(true);
       insight
-        .chat(chatId(), q, getContext())
+        .chat(privateChatId ?? chatId(), q, getContext())
         .then((res) => setMsgs((m) => [...m, { role: "ai", text: res.reply.trim() }]))
         .catch(() =>
           setMsgs((m) => [...m, { role: "ai", text: "I couldn't reach the insight service just now. Try again in a moment." }])
         )
         .finally(() => setPending(false));
     },
-    [pending, getContext]
+    [pending, getContext, privateChatId]
   );
 
   return { msgs, pending, ask };

@@ -3,12 +3,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
-// Shared services/.env that every service reads (two levels up from both
-// src/ and dist/). dotenv never overwrites a variable that's already set, so
-// a value in this service's own .env (above) wins over it.
-dotenv.config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
+// Resolve the shared .env from src/ or dist/. The working-directory .env
+// and existing environment variables take precedence.
+dotenv.config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 
 export const config = {
+  accountTrustProxy: process.env.ACCOUNT_TRUST_PROXY === "true",
+  accountOrigin: new URL(process.env.ACCOUNT_ORIGIN || "http://localhost:5173").origin,
   port: parseInt(process.env.PORT || "3000", 10),
   dbPath: process.env.NOTIFICATION_DB_PATH || "./notification.db",
   // Postgres instead of dbPath when set; this service's tables live in their

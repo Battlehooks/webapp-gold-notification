@@ -32,7 +32,7 @@ exist.
 ```bash
 python -m venv .venv && .venv/Scripts/activate
 pip install -r requirements.txt
-# secrets live in the shared services/.env (from services/.env.example):
+# secrets live in the shared .env (from .env.example):
 # SUMOPOD_API_KEY, plus AGENT_TOKEN -- /chat refuses every request until it's set
 uvicorn app.main:app --reload --port 8003
 ```
@@ -65,7 +65,7 @@ User=deploy
 WantedBy=multi-user.target
 ```
 
-No `EnvironmentFile=` is needed: the service loads the shared `services/.env` itself.
+No `EnvironmentFile=` is needed: the service loads the shared `.env` itself.
 Set `COMPOSE_PROJECT_DIR` to wherever `docker-compose.yml` actually lives on the VPS
 (it defaults to this repo's root), so `restart_container`/`list_containers`/`tail_logs`
 run `docker compose` against the right project.

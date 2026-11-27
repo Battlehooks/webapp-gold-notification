@@ -66,8 +66,12 @@ See each service's own README for endpoints, env vars, and how to run it standal
 
 ## Running everything
 
+If upgrading an existing checkout, move `services/.env` to the repository root.
+If a root `.env` already contains settings, merge the two files before restarting.
+Keep frontend-only Vite settings in `frontend/.env` when running Vite directly.
+
 ```bash
-cp services/.env.example services/.env
+cp -n .env.example .env
 # fill in the secrets -- the one file every service reads, whether it runs under
 # docker-compose (env_file) or standalone. Everything else has a default.
 
@@ -92,6 +96,26 @@ state instead of the real host's. Start it separately per
 Each backend service can also run standalone outside Docker for development — see its
 own README (`services/*/README.md`) for the venv/npm-install instructions used to build
 and test this project.
+
+### Accounts and personal holdings
+
+Select **Sign in** and then **Create an account**. Signed-in holdings are saved
+under your account and load on other devices. To bring over an existing browser
+portfolio, open **My holdings** in an empty account, select **Import holdings
+from this browser**, and save.
+
+Notification creates the `accounts` and `account_sessions` tables at startup.
+Set `DATABASE_URL` in the root `.env` to use Postgres. The database role must be
+able to create tables and, on first startup, the `notification` schema. With a
+blank URL, accounts live in Notification's existing SQLite database and volume.
+Run the SQLite-to-Postgres migration below before switching a database with data.
+
+The account API expects the frontend at `http://localhost:5173` by default. Set
+`ACCOUNT_ORIGIN` in the root `.env` if you use a different frontend origin. The
+VPS Compose overlay sets the HTTPS origin from `SITE_ADDRESS`.
+
+Market pages remain available as a guest. Browser push alerts still use the
+guest portfolio and can be managed while signed out.
 
 ### Hosting it publicly on a VPS
 
@@ -124,7 +148,7 @@ Use Sumobase's **Direct Connection** string (or Session Pooler), not the Transac
 Pooler: each service pins its schema per connection with `SET search_path`, which a
 transaction pooler doesn't keep. URL-encode any `@ : / # ? %` in the password.
 
-**Where the connection string goes:** `DATABASE_URL` in `services/.env`, the one file
+**Where the connection string goes:** `DATABASE_URL` in `.env`, the one file
 every service reads (standalone or docker-compose). Each service defaults to its own
 schema, overridable with `DB_SCHEMA`.
 
@@ -144,7 +168,7 @@ docker compose cp market-data:/app/data/market_data.db migration/
 docker compose cp insight:/app/data/insight.db migration/
 docker compose cp notification:/app/data/notification.db migration/
 
-# 3. set DATABASE_URL in services/.env, then copy the data in
+# 3. set DATABASE_URL in .env, then copy the data in
 python scripts/migrate_sqlite_to_postgres.py \
     --market-data migration/market_data.db --insight migration/insight.db \
     --notification migration/notification.db
@@ -163,7 +187,7 @@ same units; the bot only began logging IndoGold on 2026-11-22, and its old Treas
 rows are not copied). It only adds rows newer than what's already there, so run it once more just
 before starting the services to close the gap; after that Market Data logs its own.
 
-The migration script reads `DATABASE_URL` from `services/.env` (or prompts for it), copies
+The migration script reads `DATABASE_URL` from `.env` (or prompts for it), copies
 each service's tables into its schema with ids intact, moves the id sequences past them,
 and checks row counts; each service's copy is one transaction, so it lands whole or not
 at all. It refuses to write into a schema that already has rows, so it can't overwrite

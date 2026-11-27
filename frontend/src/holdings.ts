@@ -1,8 +1,5 @@
 import { useSyncExternalStore } from "react";
 
-// Holdings are personal and per-browser. They leave it only as per-turn
-// `context` on an Ask request, and -- while push alerts are on -- as a copy the
-// Notification service keeps to check take-profit/stop-loss (see alerts.ts).
 export interface Holding {
   source: string;
   qty: number;
@@ -16,11 +13,9 @@ export interface Holding {
 const KEY = "gold-notification-web-holdings";
 const listeners = new Set<() => void>();
 let cache: Holding[] | null = null;
-let merged: Holding[] | null = null;
 
 function read(): Holding[] {
   if (cache) return cache;
-  merged = null;
   try {
     const parsed = JSON.parse(localStorage.getItem(KEY) ?? "[]");
     cache = Array.isArray(parsed)
@@ -35,9 +30,7 @@ function read(): Holding[] {
   return cache;
 }
 
-function readMerged(): Holding[] {
-  const lots = read();
-  if (merged) return merged;
+export function mergeLots(lots: Holding[]): Holding[] {
   const bySource = new Map<string, Holding>();
   for (const lot of lots) {
     const h = bySource.get(lot.source);
@@ -49,13 +42,11 @@ function readMerged(): Holding[] {
     h.avg = (h.qty * h.avg + lot.qty * lot.avg) / qty;
     h.qty = qty;
   }
-  merged = [...bySource.values()];
-  return merged;
+  return [...bySource.values()];
 }
 
 export function saveHoldings(next: Holding[]): void {
   cache = next;
-  merged = null;
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
@@ -77,11 +68,6 @@ function subscribe(listener: () => void) {
     listeners.delete(listener);
     window.removeEventListener("storage", onStorage);
   };
-}
-
-/** One merged position per asset. */
-export function useHoldings(): Holding[] {
-  return useSyncExternalStore(subscribe, readMerged);
 }
 
 /** The stored purchase rows, as entered -- for the holdings dialog. */

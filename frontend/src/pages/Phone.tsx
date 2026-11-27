@@ -61,7 +61,7 @@ export function Phone({ route }: { route: Route }) {
 }
 
 function PhoneHome() {
-  const { market, positions, held, openHoldings, openAlerts } = useApp();
+  const { market, positions, held, openHoldings, openAlerts, openAccount, signedIn } = useApp();
   const pf = usePortfolio();
   const changes = useChanges();
   const [briefOpen, setBriefOpen] = useState(false);
@@ -79,13 +79,16 @@ function PhoneHome() {
   return (
     <>
       <div className="phone-header">
-        <span className="phone-brand">
-          <i className="ph ph-coins" style={{ color: "var(--color-accent)" }} />
-          gold-notification
-        </span>
-        <span className="meta-text" style={{ fontSize: 11 }}>
-          {updated ? fmtJakarta(updated) : ""}
-        </span>
+        <div className="phone-brand-group">
+          <span className="phone-brand">
+            <i className="ph ph-coins" style={{ color: "var(--color-accent)" }} />
+            gold-notification
+          </span>
+          {updated && <span className="meta-text">{fmtJakarta(updated)}</span>}
+        </div>
+        <button className="btn btn-secondary phone-account" onClick={openAccount}>
+          {signedIn ? "Account" : "Sign in"}
+        </button>
       </div>
 
       {positions.length === 0 ? (
@@ -164,16 +167,9 @@ function PhoneHome() {
       {market.error && <div className="banner error">{market.error}</div>}
 
       <div className="phone-links">
-        <a
-          href="#/"
-          onClick={(e) => {
-            e.preventDefault();
-            openAlerts();
-          }}
-        >
-          Alerts
-        </a>
-        <span>·</span>
+        {!signedIn && (
+          <button className="btn btn-ghost" onClick={openAlerts}>Alerts</button>
+        )}
         <a href="#/agent">Agent</a>
       </div>
     </>

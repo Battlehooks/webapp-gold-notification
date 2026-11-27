@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import { accountRouter } from "./accountApi.js";
 import { config } from "./config.js";
 import { initDb } from "./db.js";
 import { pushEnabled } from "./push.js";
@@ -10,6 +11,8 @@ import * as scheduler from "./scheduler.js";
 await initDb();
 
 const app = express();
+if (config.accountTrustProxy) app.set("trust proxy", 1);
+app.use("/account", accountRouter);
 app.use(cors());
 app.use(express.json());
 

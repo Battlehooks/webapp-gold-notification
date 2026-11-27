@@ -1,4 +1,4 @@
-"""Configuration. Loads .env sitting next to the service root (no python-dotenv needed)."""
+"""Configuration. Loads the service-local and repository-root .env files (no python-dotenv needed)."""
 from __future__ import annotations
 
 import os
@@ -21,9 +21,9 @@ def _load_dotenv(path: Path) -> None:
 
 
 _load_dotenv(BASE_DIR / ".env")
-# Shared services/.env that every service reads. Loaded second, so a value in
+# Repository-root .env. Loaded second, so a value in
 # this service's own .env (above) wins over it.
-_load_dotenv(BASE_DIR.parent / ".env")
+_load_dotenv(BASE_DIR.parent.parent / ".env")
 
 DB_PATH = Path(os.environ.get("MARKET_DATA_DB_PATH", BASE_DIR / "market_data.db"))
 # Postgres instead of DB_PATH when set (see app/pg_compat.py); this service's

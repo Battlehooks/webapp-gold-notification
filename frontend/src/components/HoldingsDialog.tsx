@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../appContext";
 import { fmtRp } from "../format";
-import { holdingUnit, saveHoldings, useHoldingLots, type Holding } from "../holdings";
+import { holdingUnit, type Holding } from "../holdings";
 import { groupLabel } from "../useMarket";
 
 interface Row {
@@ -15,13 +15,14 @@ const parseQty = (s: string) => Number(s.replace(",", "."));
 const parseAvg = (s: string) => (s.trim() === "" ? NaN : Math.round(Number(s.replace(/[.\s]/g, "").replace(",", "."))));
 
 export function HoldingsDialog({ onClose }: { onClose: () => void }) {
-  const { market } = useApp();
+  const { market, lots, guestLots, signedIn, saveLots } = useApp();
+  const saveDraft = useRef(saveLots).current;
   // Rows are purchases: the same asset may be listed more than once at different
   // costs, and the rest of the app sees them merged (see holdings.ts).
-  const lots = useHoldingLots();
   const [rows, setRows] = useState<Row[]>(() =>
     lots.map((h) => ({ source: h.source, qty: String(h.qty), avg: String(h.avg) }))
   );
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,18 +34,27 @@ export function HoldingsDialog({ onClose }: { onClose: () => void }) {
   const nextSource = (market.assets.find((a) => !rows.some((r) => r.source === a.source)) ?? market.assets[0])?.source;
   const update = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
-  function save() {
+  async function save() {
+    if (saving) return;
     const next: Holding[] = [];
     for (const r of rows) {
       const qty = parseQty(r.qty);
       const avg = parseAvg(r.avg);
       const name = market.bySource[r.source]?.meta.display ?? r.source;
-      if (!(qty > 0)) return setError(`${name}: quantity must be a positive number.`);
-      if (!(avg >= 0)) return setError(`${name}: average cost must be a number (IDR per unit).`);
+      if (!Number.isFinite(qty) || qty <= 0) return setError(`${name}: quantity must be a positive number.`);
+      if (!Number.isFinite(avg) || avg < 0) return setError(`${name}: average cost must be a number (IDR per unit).`);
       next.push({ source: r.source, qty, avg });
     }
-    saveHoldings(next);
-    onClose();
+    setSaving(true);
+    setError(null);
+    try {
+      await saveDraft(next);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save your holdings.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -54,9 +64,13 @@ export function HoldingsDialog({ onClose }: { onClose: () => void }) {
           My holdings
         </div>
         <div className="dialog-body">
-          Stored in this browser. They're sent along with your Ask questions so answers can refer to your
-          position, and kept by the server only while price alerts are on.
+          {signedIn ? "Saved to your account and available on your other devices." : "Saved in this browser. Sign in to keep your holdings across devices."}
         </div>
+        {signedIn && lots.length === 0 && rows.length === 0 && guestLots.length > 0 && (
+          <button className="btn btn-secondary" onClick={() => setRows(
+            guestLots.map(({ source, qty, avg }) => ({ source, qty: String(qty), avg: String(avg) }))
+          )}>Import holdings from this browser</button>
+        )}
 
         {rows.length === 0 && <div className="text-muted" style={{ fontSize: 13 }}>No holdings yet.</div>}
         {rows.map((r, i) => {
@@ -66,6 +80,7 @@ export function HoldingsDialog({ onClose }: { onClose: () => void }) {
               <div className="field">
                 <label htmlFor={`hd-src-${i}`}>Asset</label>
                 <select id={`hd-src-${i}`} className="input" value={r.source} onChange={(e) => update(i, { source: e.target.value })}>
+                  {!market.bySource[r.source] && <option value={r.source}>{r.source}</option>}
                   {market.groups.map((g) => (
                     <optgroup key={g} label={groupLabel(g)}>
                       {market.assets
@@ -117,14 +132,14 @@ export function HoldingsDialog({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         )}
-        {error && <div className="form-error">{error}</div>}
+        {error && <div className="form-error" role="alert">{error}</div>}
 
         <div className="dialog-actions">
           <button className="btn btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={save}>
-            Save
+          <button className="btn btn-primary" disabled={saving} onClick={save}>
+            {saving ? "Saving?" : "Save"}
           </button>
         </div>
       </div>

@@ -24,6 +24,9 @@ services:
 
   notification:
     <<: *restart
+    environment:
+      ACCOUNT_TRUST_PROXY: "true"
+      ACCOUNT_ORIGIN: https://${SITE_ADDRESS:?set SITE_ADDRESS to the public hostname}
     ports: !override
       - "127.0.0.1:3000:3000"
 

@@ -11,7 +11,7 @@ this system reads it except through this API.
 ```bash
 python -m venv .venv && .venv/Scripts/activate   # or source .venv/bin/activate
 pip install -r requirements.txt
-# secrets live in the shared services/.env (from services/.env.example) -- none needed here
+# secrets live in the shared .env (from .env.example) -- none needed here
 uvicorn app.main:app --reload --port 8001
 ```
 

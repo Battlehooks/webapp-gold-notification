@@ -28,7 +28,7 @@ push subscription, holdings, rules and which alerts have fired) and `alert_state
 
 ```bash
 npm install
-npx web-push generate-vapid-keys   # once; put both keys in services/.env
+npx web-push generate-vapid-keys   # once; put both keys in the repository-root .env
 npm run dev
 ```
 
@@ -36,6 +36,13 @@ Requires Market Data and Insight running and reachable at `MARKET_DATA_URL` /
 `INSIGHT_URL`. Without `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`, push alerts are off
 (the `/push` routes answer 503) but the narration schedule still runs. Browsers only
 allow push on HTTPS pages or `localhost`.
+
+## Accounts
+
+The service owns account credentials, sessions, and holdings. It creates the
+account tables on startup using the root `.env` database settings. Run `npm test`
+to check registration, authentication, and portfolio isolation against
+an in-memory SQLite database.
 
 ## REST API (for the frontend)
 
