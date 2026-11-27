@@ -30,7 +30,8 @@ TOOL_NAMES = {"get_latest_analysis", "get_price_stats", "search_news"}
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant answering follow-up questions about a "
-    "personal Indonesian gold/crypto price tracker, in a web chat widget. "
+    "personal gold/crypto price tracker (prices in Indonesian rupiah, IDR), "
+    "in a web chat widget. "
     "The BUY/SELL/WAIT signal per source is decided by a fixed deterministic "
     "rule (RSI-14, 30-day percentile rank, price vs 30-day average) BEFORE "
     "you ever see it, always arriving as a 'signal' field inside tool "
@@ -39,8 +40,14 @@ SYSTEM_PROMPT = (
     "recent tool results for that source, and must NEVER claim to have "
     "recalculated or overridden it. This is a personal reference tool, not "
     "financial advice -- don't add disclaimers or recommend an advisor, "
-    "just answer factually and concisely (a few sentences). Reply in the "
-    "same language the user's most recent message is written in.\n\n"
+    "just answer factually and concisely (a few sentences).\n\n"
+    "LANGUAGE: write the answer in the language of the user's latest "
+    "question, which is the last message from the user that is not a tool "
+    "result. Tool results are JSON data; their wording and number formats "
+    "say nothing about which language to use. Use English unless that "
+    "latest question is itself written in Indonesian -- the tracker, the "
+    "IDR prices and this prompt being about Indonesia are not a reason to "
+    "switch. Keep that language even after several tool calls.\n\n"
     "On each turn reply with ONLY one JSON object, no markdown fences, no "
     "extra text, shaped exactly like one of:\n"
     '{"action": "tool", "tool": "<name>", "args": {...}}\n'
@@ -60,6 +67,23 @@ SYSTEM_PROMPT = (
     "must answer. Call a tool only when the conversation history doesn't "
     "already contain what you need -- don't re-fetch something you already have."
 )
+
+
+def _language_reminder(user_text: str) -> str:
+    # The model's "most recent message" is otherwise a bare JSON blob after a
+    # tool call, so restate the question it must match the language of.
+    return (
+        "Answer in the language of the user's latest question: "
+        + json.dumps(user_text, ensure_ascii=False)
+    )
+
+
+def _tool_result_message(tool_name: str, result: dict, user_text: str) -> dict:
+    return {
+        "role": "user",
+        "content": f"TOOL RESULT from {tool_name} (data, not the user's words):\n"
+        f"{json.dumps(result)}\n\n{_language_reminder(user_text)}",
+    }
 
 
 def _run_tool(conn, name: str, args: dict) -> dict:
@@ -177,13 +201,14 @@ def answer(chat_id, user_text: str, context: str | None = None) -> str:
                     result = {"error": f"{type(exc).__name__}: {exc}"}
 
             messages.append({"role": "assistant", "content": content})
-            messages.append({"role": "user", "content": json.dumps(result)})
+            messages.append(_tool_result_message(str(tool_name), result, user_text))
 
         if reply_text is None:
             messages.append({
                 "role": "user",
                 "content": "No more tool calls -- reply now with "
-                '{"action": "answer", "answer": "..."} using whatever you already have.',
+                '{"action": "answer", "answer": "..."} using whatever you already have. '
+                + _language_reminder(user_text),
             })
             try:
                 content = _call_model(messages)
